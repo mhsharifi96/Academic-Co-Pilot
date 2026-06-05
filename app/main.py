@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1.endpoints import chat, ingestion, sessions
+from app.api.v1.endpoints import chat, ingestion, sessions, files
 from app.core.checkpointer import build_checkpointer_cm
 from app.agents.academic_agent import AcademicAgent
 
@@ -45,6 +45,7 @@ app.add_middleware(
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(ingestion.router, prefix="/api/v1", tags=["ingestion"])
 app.include_router(sessions.router, prefix="/api/v1", tags=["sessions"])
+app.include_router(files.router, prefix="/api/v1", tags=["files"])
 
 @app.get("/")
 async def root():

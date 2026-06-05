@@ -159,6 +159,31 @@ export default function App() {
     [sessionId, loadSession]
   );
 
+  // Open a session by a pasted key/id: load it from the backend and remember it
+  // in this browser's list so it behaves like any other saved chat.
+  const handleOpenKey = useCallback(
+    async (sid) => {
+      const id = sid.trim();
+      if (!id) return;
+      setSessionId(id);
+      setInterrupt(null);
+      await loadSession(id);
+      // Title from the first user message if we got history, else the id.
+      setMessages((current) => {
+        const firstUser = current.find((m) => m.role === "user");
+        setSessions(
+          registry.upsertSession(id, {
+            title: firstUser
+              ? registry.titleFromMessage(firstUser.content)
+              : id,
+          })
+        );
+        return current;
+      });
+    },
+    [loadSession]
+  );
+
   const handleRenameSession = useCallback((sid, title) => {
     setSessions(registry.renameSession(sid, title));
   }, []);
@@ -192,6 +217,7 @@ export default function App() {
           onNew={startNewSession}
           onRename={handleRenameSession}
           onDelete={handleDeleteSession}
+          onOpenKey={handleOpenKey}
         />
         <FileSidebar
           files={files}

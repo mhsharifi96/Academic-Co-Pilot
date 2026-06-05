@@ -9,9 +9,11 @@ export default function SessionList({
   onNew,
   onRename,
   onDelete,
+  onOpenKey,
 }) {
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState("");
+  const [keyInput, setKeyInput] = useState("");
 
   function startRename(s) {
     setEditingId(s.id);
@@ -24,12 +26,38 @@ export default function SessionList({
     setEditingId(null);
   }
 
+  function submitKey() {
+    const k = keyInput.trim();
+    if (!k) return;
+    onOpenKey(k);
+    setKeyInput("");
+  }
+
   return (
     <div className="session-list">
       <div className="session-list-head">
         <h3>Chats</h3>
         <button className="new-chat" onClick={onNew} title="Start a new chat">
           + New
+        </button>
+      </div>
+
+      <div className="open-by-key">
+        <input
+          value={keyInput}
+          placeholder="Paste session key…"
+          onChange={(e) => setKeyInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submitKey();
+          }}
+        />
+        <button
+          className="open-key-btn"
+          disabled={!keyInput.trim()}
+          onClick={submitKey}
+          title="Load a session by its id"
+        >
+          Open
         </button>
       </div>
 

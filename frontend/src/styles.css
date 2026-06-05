@@ -117,6 +117,31 @@ body {
   font-size: 12px;
 }
 
+.open-by-key {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.open-by-key input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 5px 8px;
+}
+.open-by-key input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.open-by-key .open-key-btn {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
 .session-list ul {
   list-style: none;
   margin: 0;
@@ -471,6 +496,33 @@ button.ghost {
   background: var(--bg);
   padding: 1px 5px;
   border-radius: 5px;
+}
+
+/* Clickable links to agent-generated files (charts, spreadsheets…) */
+.msg .md a.file-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 2px 9px;
+  color: var(--accent);
+  text-decoration: none;
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+.msg .md a.file-link:hover {
+  border-color: var(--accent);
+  background: rgba(91, 140, 255, 0.12);
+}
+
+.msg .md img.file-image {
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 8px 0 4px;
+  display: block;
 }
 
 .typing {
