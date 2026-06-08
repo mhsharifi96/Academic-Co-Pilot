@@ -1,11 +1,16 @@
 import uuid
 from typing import Any, Dict, Optional
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from langchain_core.messages import AIMessage
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.chat import ChatRequest, ChatResponse, ResumeRequest
 from app.agents.hitl import extract_interrupt, build_resume_command_value
 from app.core.sessions import session_manager
+from app.core.database import get_db
+from app.core.security import get_current_user
+from app.models.auth import User
+from app.services.session_service import ensure_session, get_owned_session
 
 router = APIRouter()
 
@@ -60,19 +65,34 @@ async def _to_response(result: Dict[str, Any], session_id: str) -> ChatResponse:
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest, http_request: Request):
+async def chat(
+    request: ChatRequest,
+    http_request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     """
     Main chat endpoint.  Conversation state is persisted automatically per
     ``session_id`` (LangGraph checkpointer), so you only send the new message —
     no need to replay history.
 
-    If the agent decides to run a sensitive tool (analytics_sandbox,
-    screen_abstracts_csv, ingest_pdf), the response comes back with
-    ``status="interrupted"`` and an ``interrupt`` payload.  Approve or reject it
-    via ``POST /chat/resume``.
+    Requires authentication; the session is created under / verified against the
+    current user.  If the agent decides to run a sensitive tool, the response
+    comes back with ``status="interrupted"`` — approve or reject via
+    ``POST /chat/resume``.
     """
     agent = _get_agent(http_request)
     session_id = request.session_id or str(uuid.uuid4())
+
+    # Create or verify ownership of this session, and title it from the first
+    # message.  PermissionError → the session belongs to someone else.
+    try:
+        await ensure_session(
+            db, current_user, session_id, title=request.message.strip()[:120]
+        )
+    except PermissionError:
+        raise HTTPException(status_code=404, detail="Session not found.")
+
     await session_manager.get_or_create(session_id)
 
     try:
@@ -89,7 +109,12 @@ async def chat(request: ChatRequest, http_request: Request):
 
 
 @router.post("/chat/resume", response_model=ChatResponse)
-async def resume(request: ResumeRequest, http_request: Request):
+async def resume(
+    request: ResumeRequest,
+    http_request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     """
     Resume a conversation that is paused awaiting human approval of a tool call.
 
@@ -98,6 +123,11 @@ async def resume(request: ResumeRequest, http_request: Request):
     - ``reject``: skip the tool; ``reason`` is passed back to the agent.
     """
     agent = _get_agent(http_request)
+
+    # Must own the session being resumed.
+    if await get_owned_session(db, current_user, request.session_id) is None:
+        raise HTTPException(status_code=404, detail="Session not found.")
+
     pending = await session_manager.get_pending_interrupt(request.session_id)
     if not pending:
         raise HTTPException(

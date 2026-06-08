@@ -8,10 +8,17 @@ traversal (e.g. ``?path=../../etc/passwd``).
 """
 
 import os
-from fastapi import APIRouter, HTTPException, Query
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_db
+from app.core.security import _user_from_token
 
 router = APIRouter()
+_bearer = HTTPBearer(auto_error=False)
 
 # Directories the agent writes into and that are safe to expose read-only.
 # ``data`` holds uploads + screened outputs; ``output_figures`` holds charts.
@@ -43,13 +50,22 @@ def _resolve_safe(path: str) -> str:
 async def download_file(
     path: str = Query(..., description="Path under data/ or output_figures/"),
     inline: bool = Query(False, description="Render inline (e.g. images) vs attachment"),
+    token: Optional[str] = Query(None, description="JWT, for <img>/link auth"),
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Stream a generated file (chart PNG, screened XLSX, CSV, …) to the client.
 
-    The frontend turns paths mentioned in the agent's replies into links to this
-    endpoint so users can open or download the artifact directly.
+    Requires authentication.  Because the browser cannot attach an
+    ``Authorization`` header to ``<img src>`` or link navigation, the token may
+    be supplied either in that header **or** as a ``?token=`` query param (the
+    frontend uses the query param for inline images/links).
     """
+    # Authenticate via header or query-param token.
+    bearer_token = creds.credentials if creds else None
+    await _user_from_token(bearer_token or token, db)
+
     abs_path = _resolve_safe(path)
     filename = os.path.basename(abs_path)
     disposition = "inline" if inline else "attachment"

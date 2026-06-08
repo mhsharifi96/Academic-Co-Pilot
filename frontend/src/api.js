@@ -1,69 +1,77 @@
 // Thin wrappers around the PaperAgent FastAPI endpoints.
 // Requests use relative /api paths; in dev these are proxied to :8000 by Vite
-// (see vite.config.js).
+// (see vite.config.js).  Every request carries the JWT; a 401 logs the user out.
+
+import { authHeader, onUnauthorized } from "./auth.js";
 
 const BASE = "/api/v1";
 
-async function jsonOrThrow(res) {
-  let body = null;
+async function request(path, { method = "GET", body, isForm = false } = {}) {
+  const headers = { ...authHeader() };
+  let payload = body;
+  if (body && !isForm) {
+    headers["Content-Type"] = "application/json";
+    payload = JSON.stringify(body);
+  }
+  const res = await fetch(`${BASE}${path}`, { method, headers, body: payload });
+
+  if (res.status === 401) {
+    onUnauthorized();
+    throw new Error("Your session expired — please log in again.");
+  }
+
+  let data = null;
   try {
-    body = await res.json();
+    data = await res.json();
   } catch {
-    /* non-JSON error body */
+    /* non-JSON / empty body */
   }
   if (!res.ok) {
-    const detail = body && body.detail ? body.detail : res.statusText;
-    throw new Error(detail || `Request failed (${res.status})`);
+    throw new Error((data && data.detail) || res.statusText || `Error ${res.status}`);
   }
-  return body;
+  return data;
 }
 
 export async function sendChat(message, sessionId) {
-  const res = await fetch(`${BASE}/chat`, {
+  return request("/chat", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, session_id: sessionId || undefined }),
+    body: { message, session_id: sessionId || undefined },
   });
-  return jsonOrThrow(res);
 }
 
 export async function resumeChat(sessionId, decision, { editedArgs, reason } = {}) {
-  const res = await fetch(`${BASE}/chat/resume`, {
+  return request("/chat/resume", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      session_id: sessionId,
-      decision,
-      edited_args: editedArgs,
-      reason,
-    }),
+    body: { session_id: sessionId, decision, edited_args: editedArgs, reason },
   });
-  return jsonOrThrow(res);
 }
 
 export async function uploadFiles(files, sessionId) {
   const form = new FormData();
   for (const f of files) form.append("files", f);
   if (sessionId) form.append("session_id", sessionId);
-  const res = await fetch(`${BASE}/upload`, { method: "POST", body: form });
-  return jsonOrThrow(res);
+  return request("/upload", { method: "POST", body: form, isForm: true });
 }
 
 export async function listFiles(sessionId) {
-  const res = await fetch(`${BASE}/sessions/${encodeURIComponent(sessionId)}/files`);
-  return jsonOrThrow(res);
+  return request(`/sessions/${encodeURIComponent(sessionId)}/files`);
 }
 
 export async function getHistory(sessionId) {
-  const res = await fetch(
-    `${BASE}/sessions/${encodeURIComponent(sessionId)}/history`
-  );
-  return jsonOrThrow(res);
+  return request(`/sessions/${encodeURIComponent(sessionId)}/history`);
 }
 
 export async function deleteSession(sessionId) {
-  const res = await fetch(`${BASE}/sessions/${encodeURIComponent(sessionId)}`, {
-    method: "DELETE",
+  return request(`/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" });
+}
+
+export async function listSessions() {
+  return request("/sessions");
+}
+
+export async function renameSession(sessionId, title) {
+  return request(`/sessions/${encodeURIComponent(sessionId)}`, {
+    method: "PATCH",
+    body: { title },
   });
-  return jsonOrThrow(res);
 }

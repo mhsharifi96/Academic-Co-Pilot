@@ -13,7 +13,22 @@ if not os.path.exists(OUTPUT_DIR):
 
 class SecurePythonREPL:
     def __init__(self):
-        self.repl = PythonREPL()
+        # Pre-seed the namespace with the common data-analysis libraries so the
+        # agent doesn't have to import them every turn.
+        import numpy as np
+
+        namespace = {
+            "__builtins__": __builtins__,
+            "pd": pd,
+            "np": np,
+            "plt": plt,
+        }
+        # CRITICAL: use the SAME dict for globals and locals. PythonREPL calls
+        # exec(code, globals, locals); with two distinct dicts, top-level imports
+        # land in `locals` but functions/lambdas/comprehensions resolve free names
+        # against `globals` only -> intermittent "NameError: name 'pd' is not
+        # defined" inside .apply()/comprehensions even after a successful import.
+        self.repl = PythonREPL(_globals=namespace, _locals=namespace)
 
     def run(self, code: str) -> str:
         # Pre-execution checks or setup can go here

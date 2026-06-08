@@ -1,4 +1,5 @@
 import ReactMarkdown from "react-markdown";
+import { getToken } from "../auth.js";
 
 // Artifact paths the agent writes to and that the backend will serve.
 const IMG_RE = /\.(png|jpe?g|gif|svg|webp)$/i;
@@ -10,9 +11,14 @@ function isArtifactPath(href = "") {
 
 function toDownloadUrl(path, inline) {
   const clean = path.replace(/^\.\//, "");
-  return `/api/v1/download?path=${encodeURIComponent(clean)}${
-    inline ? "&inline=true" : ""
-  }`;
+  const token = getToken();
+  // The token rides as a query param because <img>/link navigation can't send
+  // an Authorization header.
+  return (
+    `/api/v1/download?path=${encodeURIComponent(clean)}` +
+    (inline ? "&inline=true" : "") +
+    (token ? `&token=${encodeURIComponent(token)}` : "")
+  );
 }
 
 // Turn bare or backtick-wrapped artifact paths in the agent's reply into

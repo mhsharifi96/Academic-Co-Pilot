@@ -2,19 +2,23 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1.endpoints import chat, ingestion, sessions, files
+from app.api.v1.endpoints import chat, ingestion, sessions, files, auth
 from app.core.checkpointer import build_checkpointer_cm
+from app.core.database import init_models
 from app.agents.academic_agent import AcademicAgent
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Open the conversation checkpointer (Postgres saver, or in-memory fallback),
-    run its one-time table setup, build the single shared agent on top of it, and
-    expose both on ``app.state`` for the request handlers.  Everything is torn
-    down cleanly on shutdown.
+    Create application tables, open the conversation checkpointer (Postgres saver,
+    or in-memory fallback), run its one-time table setup, build the single shared
+    agent on top of it, and expose both on ``app.state`` for the request handlers.
+    Everything is torn down cleanly on shutdown.
     """
+    # Application tables (users, chat_sessions).
+    await init_models()
+
     cm = build_checkpointer_cm()
     async with cm as saver:
         # Creates the checkpoint tables if they don't exist (no-op in-memory).
@@ -42,6 +46,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(ingestion.router, prefix="/api/v1", tags=["ingestion"])
 app.include_router(sessions.router, prefix="/api/v1", tags=["sessions"])

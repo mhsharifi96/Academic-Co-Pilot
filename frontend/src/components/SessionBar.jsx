@@ -1,4 +1,11 @@
-export default function SessionBar({ sessionId, onNewSession }) {
+export default function SessionBar({
+  sessionId,
+  onNewSession,
+  view,
+  onNavigate,
+  user,
+  onLogout,
+}) {
   const shortId = sessionId
     ? sessionId.length > 14
       ? `${sessionId.slice(0, 8)}…${sessionId.slice(-4)}`
@@ -11,13 +18,32 @@ export default function SessionBar({ sessionId, onNewSession }) {
         <span className="logo">📚</span>
         <span>Academic Co-Pilot</span>
       </div>
+
+      <nav className="topnav">
+        <button
+          className={`nav-link${view === "chat" ? " active" : ""}`}
+          onClick={() => onNavigate("chat")}
+        >
+          Chat
+        </button>
+        <button
+          className={`nav-link${view === "guidelines" ? " active" : ""}`}
+          onClick={() => onNavigate("guidelines")}
+        >
+          Guidelines
+        </button>
+      </nav>
+
       <div className="session-meta">
-        <span>session</span>
-        <span className="session-id" title={sessionId || "A session starts on your first message or upload"}>
+        <span
+          className="session-id"
+          title={sessionId || "A session starts on your first message or upload"}
+        >
           {shortId}
         </span>
-        <button className="ghost" onClick={onNewSession}>
-          New session
+        {user && <span className="user-email" title={user.email}>{user.email}</span>}
+        <button className="ghost" onClick={onLogout}>
+          Log out
         </button>
       </div>
     </header>

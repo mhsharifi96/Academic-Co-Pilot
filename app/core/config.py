@@ -9,6 +9,11 @@ class Settings(BaseSettings):
     # PostgreSQL / pgvector Configuration
     DATABASE_URL: str
 
+    # Authentication (JWT)
+    JWT_SECRET: str = "change-me-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+
     # LangSmith Configuration
     LANGCHAIN_TRACING_V2: bool = True
     LANGCHAIN_ENDPOINT: Optional[str] = None

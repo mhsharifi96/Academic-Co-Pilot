@@ -2,10 +2,15 @@ import os
 import shutil
 import uuid
 from typing import List, Optional
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.schemas.ingestion import IngestionResponse, FileIngestionResult
 from app.tools.ingestor import ingest_pdf
 from app.core.sessions import session_manager
+from app.core.database import get_db
+from app.core.security import get_current_user
+from app.models.auth import User
+from app.services.session_service import ensure_session
 
 router = APIRouter()
 
@@ -21,6 +26,8 @@ if not os.path.exists(UPLOAD_ROOT):
 async def upload_files(
     files: List[UploadFile] = File(...),
     session_id: Optional[str] = Form(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Upload one or more files (PDF or CSV).
@@ -29,11 +36,18 @@ async def upload_files(
     - CSVs are saved to the session's upload directory for screening/analysis.
 
     All uploaded files are saved under ``data/<session_id>/`` and associated with
-    that ``session_id`` so the chat agent can reference them.  A new session is
-    created if none is provided.
+    that ``session_id`` so the chat agent can reference them.  Requires
+    authentication; the session is created under / verified against the user.
     """
     # Resolve session and its dedicated upload directory.
     sid = session_id or str(uuid.uuid4())
+
+    # Create or verify ownership of the session before writing any files.
+    try:
+        await ensure_session(db, current_user, sid)
+    except PermissionError:
+        raise HTTPException(status_code=404, detail="Session not found.")
+
     upload_dir = os.path.join(UPLOAD_ROOT, sid)
     os.makedirs(upload_dir, exist_ok=True)
 
