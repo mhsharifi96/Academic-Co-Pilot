@@ -6,7 +6,13 @@ JSON straight to the parsers.
 Fixture-free so the suite also runs under tests/run_all.py.
 """
 
-from app.tools.literature import _parse_arxiv_atom, _format_crossref_work, _bibtex_key
+from app.tools.literature import (
+    _parse_arxiv_atom,
+    _format_crossref_work,
+    _bibtex_key,
+    _parse_scopus_results,
+    _scopus_link,
+)
 
 
 _ARXIV_XML = """<?xml version="1.0" encoding="UTF-8"?>
@@ -85,3 +91,57 @@ def test_format_crossref_handles_missing_fields():
     assert "Untitled-ish" in out
     assert "(unknown)" in out          # missing authors/year/venue
     assert "@misc{anon" in out         # non-journal -> misc, no authors -> anon key
+
+
+_SCOPUS_RESPONSE = {
+    "search-results": {
+        "entry": [
+            {
+                "dc:identifier": "SCOPUS_ID:85012345678",
+                "dc:title": "Agentic RAG for Compliance",
+                "dc:creator": "Lovelace A.",
+                "prism:publicationName": "Journal of AI",
+                "prism:coverDate": "2024-03-01",
+                "prism:doi": "10.1000/xyz123",
+                "citedby-count": "42",
+                "link": [
+                    {"@ref": "self", "@href": "https://api.elsevier.com/..."},
+                    {"@ref": "scopus", "@href": "https://www.scopus.com/record/123"},
+                ],
+            }
+        ]
+    }
+}
+
+
+def test_scopus_link_prefers_scopus_ref():
+    entry = _SCOPUS_RESPONSE["search-results"]["entry"][0]
+    assert _scopus_link(entry) == "https://www.scopus.com/record/123"
+
+
+def test_scopus_link_falls_back_to_doi():
+    assert _scopus_link({"prism:doi": "10.1/abc"}) == "https://doi.org/10.1/abc"
+    assert _scopus_link({}) == ""
+
+
+def test_parse_scopus_extracts_fields():
+    papers = _parse_scopus_results(_SCOPUS_RESPONSE)
+    assert len(papers) == 1
+    p = papers[0]
+    assert p["title"] == "Agentic RAG for Compliance"
+    assert p["author"] == "Lovelace A."
+    assert p["venue"] == "Journal of AI"
+    assert p["year"] == "2024"
+    assert p["doi"] == "10.1000/xyz123"
+    assert p["cited_by"] == "42"
+    assert p["scopus_id"] == "85012345678"   # SCOPUS_ID: prefix stripped
+    assert p["link"] == "https://www.scopus.com/record/123"
+
+
+def test_parse_scopus_empty_error_entry_is_skipped():
+    data = {"search-results": {"entry": [{"error": "Result set was empty"}]}}
+    assert _parse_scopus_results(data) == []
+
+
+def test_parse_scopus_missing_results_key():
+    assert _parse_scopus_results({}) == []

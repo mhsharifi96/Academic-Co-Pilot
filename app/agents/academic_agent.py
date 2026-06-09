@@ -18,8 +18,9 @@ from app.tools.drafter import draft_paper_section
 from app.tools.sandbox import analytics_sandbox
 from app.tools.file_utils import get_csv_info, list_session_files
 from app.tools.retrieval import search_my_papers, summarize_paper
-from app.tools.literature import search_literature, resolve_citation
+from app.tools.literature import search_literature, resolve_citation, search_scopus
 from app.tools.exporter import compile_paper
+from app.tools.task_planner import write_plan, update_plan
 
 
 def _load_skills() -> str:
@@ -69,7 +70,10 @@ class AcademicAgent(BaseAgent):
                 summarize_paper,
                 search_literature,
                 resolve_citation,
+                search_scopus,
                 compile_paper,
+                write_plan,
+                update_plan,
             ]
 
         self.skills_content = _load_skills()
@@ -107,14 +111,22 @@ class AcademicAgent(BaseAgent):
             "so you know the exact column names and data types.\n"
             "- To gather evidence, use `search_my_papers` (semantic search over "
             "already-ingested PDFs), `search_literature` (discover new papers on "
-            "arXiv), and `resolve_citation` (fetch clean citation metadata/BibTeX "
-            "from a DOI or title). Use `summarize_paper` for a quick TL;DR of a "
-            "single PDF without ingesting it. These are read-only and run without "
-            "approval.\n"
+            "arXiv), `search_scopus` (peer-reviewed/indexed literature with "
+            "citation counts, when configured), and `resolve_citation` (fetch "
+            "clean citation metadata/BibTeX from a DOI or title). Use "
+            "`summarize_paper` for a quick TL;DR of a single PDF without ingesting "
+            "it. These are read-only and run without approval.\n"
             "- The tools `analytics_sandbox`, `screen_abstracts_csv`, `ingest_pdf`, "
             "`draft_paper_section`, and `compile_paper` require human approval "
             "before they run; proceed to call them when appropriate and the system "
-            "will handle the approval step.\n\n"
+            "will handle the approval step.\n"
+            "- For any task that needs several steps or tool calls (roughly 3 or "
+            "more), call `write_plan` FIRST to lay out the ordered steps, then call "
+            "`update_plan` to mark each step `in_progress`/`done` as you go. Your "
+            "current plan is shown back to you at the start of every turn, so it "
+            "keeps you on track across summarization and approval pauses. These "
+            "planning tools run without approval. Skip planning for simple "
+            "one-or-two-step requests.\n\n"
             "Writing a full paper (section by section with approval):\n"
             "When the user asks you to write the full/whole paper, follow this "
             "protocol strictly:\n"

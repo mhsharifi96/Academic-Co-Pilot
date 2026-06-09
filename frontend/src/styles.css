@@ -883,3 +883,67 @@ button.ghost {
   margin: 10px 20px 0;
   font-size: 13px;
 }
+
+/* ----- Task plan sidebar ----- */
+.plan-section {
+  margin-top: 18px;
+}
+
+.plan-section h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.plan-progress {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.plan-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.plan-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.plan-item .plan-icon {
+  flex: none;
+  font-weight: 700;
+}
+
+.plan-item.done {
+  opacity: 0.65;
+}
+.plan-item.done .plan-text {
+  text-decoration: line-through;
+}
+.plan-item.done .plan-icon {
+  color: var(--green);
+}
+.plan-item.in_progress .plan-icon {
+  color: var(--amber);
+}
+.plan-item.pending .plan-icon {
+  color: var(--muted);
+}

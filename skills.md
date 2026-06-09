@@ -90,3 +90,17 @@ This file defines the skills (tools) available to the Academic Co-Pilot Agent.
     *   `title` (str): The paper title (used as document heading and filename).
     *   `sections` (List[Dict]): Ordered sections, each `{"heading": str, "body": str}`.
     *   `output_path` (Optional[str]): Path for the .docx. Defaults to `data/<slug>.docx`.
+
+## 15. Task Planner (`write_plan`, `update_plan`)
+*   **Description:** A self-authored todo list for multi-step tasks. Call `write_plan` FIRST whenever a request needs several steps/tool calls (roughly 3+) to lay out an ordered checklist, then call `update_plan` to mark each step `in_progress`/`done` as you progress. The plan is stored per session (outside the chat history) and shown back to you at the start of every turn, so it survives history summarization and approval pauses. Read-only scratch memory (no approval); the `session_id` is supplied automatically. Skip planning for simple one-or-two-step requests.
+*   **Inputs (`write_plan`):**
+    *   `steps` (List[str]): Ordered, short step descriptions.
+*   **Inputs (`update_plan`):**
+    *   `step_index` (int): Zero-based index of the step to update.
+    *   `status` (str): `in_progress`, `done`, or `pending`.
+
+## 16. Scopus Search (`search_scopus`)
+*   **Description:** Searches Elsevier's Scopus for peer-reviewed / indexed academic literature, including citation counts. Complements `search_literature` (arXiv preprints) by covering published, indexed work across publishers. Requires `ELSEVIER_API_KEY` on the server; reports a friendly message when unset. Plain keywords are matched against title/abstract/keywords; Scopus boolean syntax is also accepted. Read-only (no approval).
+*   **Inputs:**
+    *   `query` (str): Search terms or a Scopus boolean query.
+    *   `max_results` (int, default=10): Maximum number of results (capped at 25).

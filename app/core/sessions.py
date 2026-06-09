@@ -16,9 +16,13 @@ from typing import Any, Dict, List, Optional
 
 @dataclass
 class Session:
-    """Holds uploaded file paths and pending-interrupt state for one session."""
+    """Holds uploaded file paths, the task plan, and pending-interrupt state."""
     session_id: str
     files: List[str] = field(default_factory=list)
+    # Ordered task checklist the agent writes for itself; each item is
+    # {"text": str, "status": "pending" | "in_progress" | "done"}.  Lives here
+    # (not in the message history) so it survives summarization and HITL pauses.
+    plan: List[Dict[str, Any]] = field(default_factory=list)
     pending_interrupt: Optional[Dict[str, Any]] = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -80,22 +84,81 @@ class SessionManager:
             return session.pending_interrupt if session else None
 
     # ------------------------------------------------------------------
-    # Synchronous wrapper for use inside LangChain @tool functions
+    # Task plan (agent-authored multi-step checklist)
+    # ------------------------------------------------------------------
+
+    _VALID_STATUSES = ("pending", "in_progress", "done")
+
+    async def get_plan(self, session_id: str) -> List[Dict[str, Any]]:
+        """Return a copy of the session's task plan, or empty list if none."""
+        async with self._lock:
+            session = self._sessions.get(session_id)
+            return [dict(item) for item in session.plan] if session else []
+
+    async def set_plan(self, session_id: str, steps: List[str]) -> None:
+        """Replace the session's plan with a fresh checklist (all pending)."""
+        async with self._lock:
+            session = self._sessions.setdefault(
+                session_id, Session(session_id=session_id)
+            )
+            session.plan = [
+                {"text": str(step), "status": "pending"}
+                for step in steps
+                if str(step).strip()
+            ]
+
+    async def update_plan_step(
+        self, session_id: str, index: int, status: str
+    ) -> None:
+        """Set one plan step's status.  Out-of-range index / unknown status is a no-op."""
+        if status not in self._VALID_STATUSES:
+            return
+        async with self._lock:
+            session = self._sessions.get(session_id)
+            if session and 0 <= index < len(session.plan):
+                session.plan[index]["status"] = status
+
+    # ------------------------------------------------------------------
+    # Synchronous wrappers for use inside LangChain @tool functions
     # (which run synchronously within the agent graph).
     # ------------------------------------------------------------------
 
-    def sync_get_files(self, session_id: str) -> List[str]:
-        """Synchronous wrapper around get_files()."""
+    @staticmethod
+    def _run_sync(coro: Any) -> Any:
+        """
+        Run an async coroutine to completion from sync code.
+
+        When no event loop is running we can use ``asyncio.run`` directly.  When
+        a loop IS already running (the usual case inside the agent graph), run
+        the coroutine in a separate thread with its own loop so we don't deadlock
+        on the asyncio.Lock.
+        """
         try:
             asyncio.get_running_loop()
         except RuntimeError:
-            return asyncio.run(self.get_files(session_id))
+            return asyncio.run(coro)
 
-        # A loop is already running — run the coroutine in a separate thread
-        # with its own loop so we don't deadlock on the asyncio.Lock.
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(asyncio.run, self.get_files(session_id))
+            future = executor.submit(asyncio.run, coro)
             return future.result()
+
+    def sync_get_files(self, session_id: str) -> List[str]:
+        """Synchronous wrapper around get_files()."""
+        return self._run_sync(self.get_files(session_id))
+
+    def sync_get_plan(self, session_id: str) -> List[Dict[str, Any]]:
+        """Synchronous wrapper around get_plan()."""
+        return self._run_sync(self.get_plan(session_id))
+
+    def sync_set_plan(self, session_id: str, steps: List[str]) -> None:
+        """Synchronous wrapper around set_plan()."""
+        return self._run_sync(self.set_plan(session_id, steps))
+
+    def sync_update_plan_step(
+        self, session_id: str, index: int, status: str
+    ) -> None:
+        """Synchronous wrapper around update_plan_step()."""
+        return self._run_sync(self.update_plan_step(session_id, index, status))
 
 
 # Module-level singleton

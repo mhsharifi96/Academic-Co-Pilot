@@ -9,6 +9,14 @@ class Settings(BaseSettings):
     # PostgreSQL / pgvector Configuration
     DATABASE_URL: str
 
+    # Crossref "polite pool" contact email. Not a secret and not required, but
+    # identifying your traffic gets better/more predictable rate limits.
+    CROSSREF_MAILTO: str = "paperagent@example.com"
+
+    # Elsevier (Scopus) Search API key. Secret — set via .env, never commit.
+    # Optional: the Scopus search tool reports a friendly message when unset.
+    ELSEVIER_API_KEY: Optional[str] = None
+
     # Authentication (JWT)
     JWT_SECRET: str = "change-me-in-production"
     JWT_ALGORITHM: str = "HS256"

@@ -4,6 +4,7 @@ import * as auth from "./auth.js";
 import SessionBar from "./components/SessionBar.jsx";
 import SessionList from "./components/SessionList.jsx";
 import FileSidebar from "./components/FileSidebar.jsx";
+import PlanSidebar from "./components/PlanSidebar.jsx";
 import ChatWindow from "./components/ChatWindow.jsx";
 import MessageInput from "./components/MessageInput.jsx";
 import GuidelinesPage from "./components/GuidelinesPage.jsx";
@@ -15,6 +16,7 @@ export default function App() {
   const [sessions, setSessions] = useState([]); // {id, title, updated_at}
   const [messages, setMessages] = useState([]); // {role, content}
   const [files, setFiles] = useState([]); // {path, filename, type}
+  const [plan, setPlan] = useState([]); // {text, status}
   const [interrupt, setInterrupt] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -30,6 +32,7 @@ export default function App() {
       setMessages([]);
       setFiles([]);
       setInterrupt(null);
+      setPlan([]);
     };
     window.addEventListener("auth:logout", handler);
     return () => window.removeEventListener("auth:logout", handler);
@@ -55,17 +58,30 @@ export default function App() {
     setError(null);
     setLoading(true);
     try {
-      const [hist, listed] = await Promise.all([
+      const [hist, listed, planResp] = await Promise.all([
         api.getHistory(sid),
         api.listFiles(sid),
+        api.getPlan(sid),
       ]);
       setMessages((hist.messages || []).map((m) => ({ ...m })));
       setFiles(listed.files || []);
+      setPlan(planResp.plan || []);
       setInterrupt(hist.interrupted ? hist.interrupt : null);
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  // Re-fetch just the agent's plan (after a reply, the agent may have updated it).
+  const refreshPlan = useCallback(async (sid) => {
+    if (!sid) return;
+    try {
+      const planResp = await api.getPlan(sid);
+      setPlan(planResp.plan || []);
+    } catch {
+      /* non-fatal: leave the existing plan in place */
     }
   }, []);
 
@@ -92,15 +108,16 @@ export default function App() {
       setLoading(true);
       try {
         const resp = await api.sendChat(trimmed, sessionId);
-        applyResponse(resp);
+        const sid = applyResponse(resp);
         refreshSessions(); // backend upserts the session row (title/updated_at)
+        refreshPlan(sid || sessionId); // the agent may have written/updated its plan
       } catch (e) {
         setError(e.message);
       } finally {
         setLoading(false);
       }
     },
-    [sessionId, loading, applyResponse, refreshSessions]
+    [sessionId, loading, applyResponse, refreshSessions, refreshPlan]
   );
 
   const handleResume = useCallback(
@@ -111,13 +128,14 @@ export default function App() {
       try {
         const resp = await api.resumeChat(sessionId, decision, opts);
         applyResponse(resp);
+        refreshPlan(sessionId); // approving/rejecting may advance the agent's plan
       } catch (e) {
         setError(e.message);
       } finally {
         setLoading(false);
       }
     },
-    [sessionId, loading, applyResponse]
+    [sessionId, loading, applyResponse, refreshPlan]
   );
 
   const handleUpload = useCallback(
@@ -148,6 +166,7 @@ export default function App() {
     setSessionId(null);
     setMessages([]);
     setFiles([]);
+    setPlan([]);
     setInterrupt(null);
     setError(null);
     setDraft("");
@@ -250,6 +269,7 @@ export default function App() {
               onInsertPath={insertPath}
               busy={loading}
             />
+            <PlanSidebar plan={plan} />
           </aside>
 
           <main className="main">
