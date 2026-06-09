@@ -23,6 +23,23 @@ authentication and persistence layer on top of the original agent MVP:
   `SessionManager.get_files` now rehydrates the list from that directory, so all
   three callers survive restarts.
 ### Added
+- **License: PolyForm Noncommercial 1.0.0.** Added a `LICENSE` file (© 2026
+  mhsharifi96) making the project source-available for noncommercial use only —
+  personal, research, education, and non-profit use is permitted; commercial use
+  is not. Declared via `license`/`license-files` in `pyproject.toml`, a `license`
+  field in `frontend/package.json`, and a License section in the README.
+- **Second selectable agent: a "Deep Agent" (`deepagents`).** Alongside the
+  existing `AcademicAgent`, the app now builds a `DeepResearchAgent`
+  (`app/agents/deep_agent.py`) on top of LangChain's `deepagents.create_deep_agent`.
+  It runs fully autonomously — built-in `write_todos` planning, a thread-scoped
+  virtual-filesystem working memory, and **no** human-in-the-loop — while sharing
+  the academic agent's tools (minus the bespoke `write_plan`/`update_plan`, now
+  factored into `app/agents/tools.py:default_tools`) and the same Postgres
+  checkpointer. The user picks the agent **before** the first message via a new
+  `AgentSelector` card in the chat window; the choice is stored on the
+  `ChatSession.agent_type` column and bound to the session for "load & continue".
+  The Plan sidebar reflects the deep agent's `todos` for deep sessions. New
+  `agent_type` field on `ChatRequest`, `SessionSummary`, and the history response.
 - **Agent task planner** (`write_plan` / `update_plan` in `app/tools/task_planner.py`):
   a self-authored todo list for multi-step jobs. The agent writes an ordered
   checklist and ticks steps off as it goes. The plan is stored per session in

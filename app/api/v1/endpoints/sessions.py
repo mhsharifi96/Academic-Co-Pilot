@@ -48,6 +48,7 @@ class SessionSummary(BaseModel):
     id: str
     title: str
     updated_at: str
+    agent_type: str = "academic"  # "academic" | "deep"
 
 
 class RenameRequest(BaseModel):
@@ -65,6 +66,7 @@ class SessionHistoryResponse(BaseModel):
     messages: List[HistoryMessage]
     interrupted: bool = False
     interrupt: Optional[dict] = None
+    agent_type: str = "academic"  # "academic" | "deep"
 
 
 class DeleteSessionResponse(BaseModel):
@@ -75,6 +77,39 @@ class DeleteSessionResponse(BaseModel):
 def _file_type(path: str) -> str:
     ext = os.path.splitext(path)[1].lower().lstrip(".")
     return ext if ext in ("pdf", "csv") else "other"
+
+
+def _agent_for(request: Request, agent_type: str):
+    """Resolve the shared agent object bound to ``agent_type``."""
+    attr = "deep_agent" if agent_type == "deep" else "agent"
+    return getattr(request.app.state, attr, None)
+
+
+# deepagents todo status -> our PlanItem status vocabulary.
+_DEEP_STATUS_MAP = {"pending": "pending", "in_progress": "in_progress", "completed": "done"}
+
+
+async def _deep_plan_items(request: Request, session_id: str) -> List["PlanItem"]:
+    """Read a deep session's built-in ``write_todos`` plan from graph state."""
+    agent = _agent_for(request, "deep")
+    if agent is None:
+        return []
+    config = {"configurable": {"thread_id": session_id}}
+    try:
+        state = await agent.agent.aget_state(config)
+    except Exception:
+        return []
+    todos = (state.values or {}).get("todos", []) if state else []
+    items: List[PlanItem] = []
+    for t in todos:
+        if not isinstance(t, dict):
+            continue
+        text = t.get("content", "")
+        if not text:
+            continue
+        status = _DEEP_STATUS_MAP.get(t.get("status", "pending"), "pending")
+        items.append(PlanItem(text=text, status=status))
+    return items
 
 
 def _msg_text(content) -> str:
@@ -100,7 +135,12 @@ async def list_sessions(
     """List the current user's chat sessions, newest-updated first."""
     rows = await list_user_sessions(db, current_user)
     return [
-        SessionSummary(id=r.id, title=r.title, updated_at=r.updated_at.isoformat())
+        SessionSummary(
+            id=r.id,
+            title=r.title,
+            updated_at=r.updated_at.isoformat(),
+            agent_type=r.agent_type,
+        )
         for r in rows
     ]
 
@@ -151,23 +191,33 @@ async def list_files(
 @router.get("/sessions/{session_id}/plan", response_model=SessionPlanResponse)
 async def get_plan(
     session_id: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> SessionPlanResponse:
     """
     Return the agent's current task plan for a session the user owns.
 
-    The plan is the agent-authored checklist (written via ``write_plan`` and
-    updated via ``update_plan``); the web UI renders it as a live progress
-    sidebar.  Empty list when the agent hasn't created a plan yet.
+    - **Academic** sessions: the plan is the agent-authored checklist written via
+      ``write_plan`` / ``update_plan`` (kept in ``SessionManager``).
+    - **Deep** sessions: the plan is the ``deepagents`` built-in ``write_todos``
+      list, read from the graph state (``todos``) and mapped to the same shape.
+
+    Either way the web UI renders it as a live progress sidebar.  Empty list when
+    the agent hasn't created a plan yet.
     """
-    if await get_owned_session(db, current_user, session_id) is None:
+    cs = await get_owned_session(db, current_user, session_id)
+    if cs is None:
         raise HTTPException(status_code=404, detail="Session not found.")
-    plan = await session_manager.get_plan(session_id)
-    items = [
-        PlanItem(text=item.get("text", ""), status=item.get("status", "pending"))
-        for item in plan
-    ]
+
+    if cs.agent_type == "deep":
+        items = await _deep_plan_items(request, session_id)
+    else:
+        plan = await session_manager.get_plan(session_id)
+        items = [
+            PlanItem(text=item.get("text", ""), status=item.get("status", "pending"))
+            for item in plan
+        ]
     return SessionPlanResponse(session_id=session_id, plan=items)
 
 
@@ -187,18 +237,23 @@ async def get_history(
     been compressed by ``SummarizationMiddleware``, so very old turns can appear
     as a summary rather than verbatim.
     """
-    if await get_owned_session(db, current_user, session_id) is None:
+    cs = await get_owned_session(db, current_user, session_id)
+    if cs is None:
         raise HTTPException(status_code=404, detail="Session not found.")
 
-    agent = getattr(request.app.state, "agent", None)
+    agent = _agent_for(request, cs.agent_type)
     if agent is None:
-        return SessionHistoryResponse(session_id=session_id, messages=[])
+        return SessionHistoryResponse(
+            session_id=session_id, messages=[], agent_type=cs.agent_type
+        )
 
     config = {"configurable": {"thread_id": session_id}}
     try:
         state = await agent.agent.aget_state(config)
     except Exception:
-        return SessionHistoryResponse(session_id=session_id, messages=[])
+        return SessionHistoryResponse(
+            session_id=session_id, messages=[], agent_type=cs.agent_type
+        )
 
     raw_messages = (state.values or {}).get("messages", []) if state else []
     messages: List[HistoryMessage] = []
@@ -222,6 +277,7 @@ async def get_history(
         messages=messages,
         interrupted=interrupted and pending is not None,
         interrupt=pending if interrupted else None,
+        agent_type=cs.agent_type,
     )
 
 

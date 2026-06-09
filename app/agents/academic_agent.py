@@ -6,21 +6,8 @@ from langchain.agents.middleware import SummarizationMiddleware
 
 from app.agents.base import BaseAgent
 from app.agents.hitl import build_hitl_middleware
+from app.agents.tools import default_tools
 from app.core.config import settings
-from app.tools.screener import screen_abstracts_csv
-from app.tools.ingestor import ingest_pdf
-from app.tools.planner import (
-    suggest_paper_titles,
-    generate_paper_outline,
-    plan_paper_sections,
-)
-from app.tools.drafter import draft_paper_section
-from app.tools.sandbox import analytics_sandbox
-from app.tools.file_utils import get_csv_info, list_session_files
-from app.tools.retrieval import search_my_papers, summarize_paper
-from app.tools.literature import search_literature, resolve_citation, search_scopus
-from app.tools.exporter import compile_paper
-from app.tools.task_planner import write_plan, update_plan
 
 
 def _load_skills() -> str:
@@ -56,25 +43,7 @@ class AcademicAgent(BaseAgent):
         checkpointer: Optional[BaseCheckpointSaver] = None,
     ):
         if tools is None:
-            tools = [
-                screen_abstracts_csv,
-                ingest_pdf,
-                suggest_paper_titles,
-                generate_paper_outline,
-                plan_paper_sections,
-                draft_paper_section,
-                analytics_sandbox,
-                get_csv_info,
-                list_session_files,
-                search_my_papers,
-                summarize_paper,
-                search_literature,
-                resolve_citation,
-                search_scopus,
-                compile_paper,
-                write_plan,
-                update_plan,
-            ]
+            tools = default_tools(include_task_planner=True)
 
         self.skills_content = _load_skills()
 

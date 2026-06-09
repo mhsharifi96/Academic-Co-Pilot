@@ -1,8 +1,17 @@
 import { useEffect, useRef } from "react";
 import Message from "./Message.jsx";
 import InterruptCard from "./InterruptCard.jsx";
+import AgentSelector from "./AgentSelector.jsx";
 
-export default function ChatWindow({ messages, interrupt, loading, onResume }) {
+export default function ChatWindow({
+  messages,
+  interrupt,
+  loading,
+  onResume,
+  agentType,
+  onAgentTypeChange,
+  agentLocked,
+}) {
   const endRef = useRef(null);
 
   useEffect(() => {
@@ -13,6 +22,13 @@ export default function ChatWindow({ messages, interrupt, loading, onResume }) {
 
   return (
     <div className="chat-window">
+      {/* Pick an agent before the first message; a locked badge afterwards. */}
+      <AgentSelector
+        value={agentType}
+        onChange={onAgentTypeChange}
+        locked={agentLocked}
+      />
+
       {empty && (
         <div className="welcome">
           <h2>👋 Welcome to your Academic Co-Pilot</h2>

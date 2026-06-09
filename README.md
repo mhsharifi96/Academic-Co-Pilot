@@ -300,4 +300,12 @@ The tools `analytics_sandbox`, `screen_abstracts_csv`, and `ingest_pdf` are gate
 3. The resume returns either a `"complete"` response or another `"interrupted"` one (if the agent queued more gated calls).
 
 ---
+
+## License
+
+This project is licensed under the **[PolyForm Noncommercial License 1.0.0](LICENSE)** — © 2026 mhsharifi96.
+
+You may use, modify, and share it freely for **any noncommercial purpose** (personal projects, study, research, education, non-profits). **Commercial use is not permitted** under this license. See the [LICENSE](LICENSE) file for the full terms.
+
+---
 *Built with ❤️ for the research community.*

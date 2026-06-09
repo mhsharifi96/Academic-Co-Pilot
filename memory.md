@@ -17,6 +17,12 @@ over re-scanning the codebase. For depth see `Design.md`, `PRD.md`,
 2. **Two "session" things** — `ChatSession` DB row (ownership/title) vs in-memory
    `SessionManager` (files + pending interrupt). `session_id == thread_id == ChatSession.id`.
 3. **One shared agent** built in `app/main.py` `lifespan`, on `app.state.agent`.
+   A second, independent **deep agent** (`deepagents.create_deep_agent`,
+   `app/agents/deep_agent.py`) is built on `app.state.deep_agent`. Each session is
+   bound to one of them by `ChatSession.agent_type` (`"academic"|"deep"`), chosen
+   in the UI **before** the first message and immutable after. The deep agent is
+   autonomous: built-in `write_todos` planning + virtual-fs memory, **no HITL**.
+   Both share the tool set (`app/agents/tools.py:default_tools`) and checkpointer.
 4. **HITL gating** — tools in `INTERRUPT_TOOLS` (`app/agents/hitl.py`:
    `analytics_sandbox`, `screen_abstracts_csv`, `ingest_pdf`, `draft_paper_section`)
    pause for approve/edit/reject via `/chat/resume`.

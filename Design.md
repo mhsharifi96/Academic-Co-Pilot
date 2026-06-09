@@ -37,6 +37,16 @@ on top of it, and stores it on `app.state.agent`. Rationale: the Postgres saver
 holds a connection pool whose lifecycle must be owned centrally; rebuilding the
 agent per request would be wasteful and would leak connections.
 
+The lifespan also builds a **second** agent, `DeepResearchAgent`
+(`app/agents/deep_agent.py`, on `app.state.deep_agent`), wrapping
+`deepagents.create_deep_agent`. It is autonomous (built-in `write_todos` planning,
+virtual-filesystem working memory, **no** human-in-the-loop) and shares the
+academic agent's tools (`app/agents/tools.py:default_tools`, minus the bespoke
+planning tools) and the same checkpointer. Each session is **bound** to one agent
+via `ChatSession.agent_type` (`"academic"|"deep"`), chosen in the UI before the
+first message and immutable thereafter — so a given `thread_id` is only ever
+driven by one graph type, avoiding checkpoint state-schema clashes.
+
 ### 2. Three separate Postgres-backed stores (deliberately distinct)
 Same database, three independent subsystems — **do not conflate them**:
 | Store | Module | Driver | Holds |

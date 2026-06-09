@@ -40,10 +40,14 @@ async def ensure_session(
     user: User,
     session_id: str,
     title: Optional[str] = None,
+    agent_type: Optional[str] = None,
 ) -> ChatSession:
     """
     Create the session row if missing (owned by ``user``), otherwise touch it.
     If a row with this id exists but belongs to someone else, raise PermissionError.
+
+    ``agent_type`` ("academic" | "deep") is recorded only when the row is first
+    created — the binding is immutable, so it is ignored for existing sessions.
     """
     cs = await db.get(ChatSession, session_id)
     if cs is None:
@@ -51,6 +55,7 @@ async def ensure_session(
             id=session_id,
             user_id=user.id,
             title=(title or "New chat")[:120],
+            agent_type=agent_type if agent_type in ("academic", "deep") else "academic",
         )
         db.add(cs)
     elif cs.user_id != user.id:

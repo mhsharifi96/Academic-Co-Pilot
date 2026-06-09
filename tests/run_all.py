@@ -53,6 +53,7 @@ TEST_MODULES = [
     "test_literature",
     "test_exporter",
     "test_retrieval",
+    "test_deep_agent_tools",
 ]
 
 

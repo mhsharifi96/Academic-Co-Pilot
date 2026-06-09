@@ -26,6 +26,18 @@ class SecurePythonREPL:
         import networkx as nx
         from wordcloud import WordCloud
 
+        # Handy general-purpose standard-library modules, also pre-seeded so the
+        # agent can use them without an explicit import. (Imports still work too,
+        # since __builtins__ is exposed below.)
+        import json
+        import math
+        import statistics
+        import datetime
+        import collections
+        import itertools
+        import random
+        from collections import Counter, defaultdict
+
         namespace = {
             "__builtins__": __builtins__,
             "pd": pd,
@@ -33,6 +45,17 @@ class SecurePythonREPL:
             "plt": plt,
             "nx": nx,
             "WordCloud": WordCloud,
+            # General-purpose stdlib helpers.
+            "re": re,
+            "json": json,
+            "math": math,
+            "statistics": statistics,
+            "datetime": datetime,
+            "collections": collections,
+            "itertools": itertools,
+            "random": random,
+            "Counter": Counter,
+            "defaultdict": defaultdict,
         }
         # CRITICAL: use the SAME dict for globals and locals. PythonREPL calls
         # exec(code, globals, locals); with two distinct dicts, top-level imports
@@ -86,7 +109,8 @@ def _repair_code(code: str, error: str) -> str:
         system = (
             "You are a Python debugging assistant for a data-analysis sandbox "
             "(pandas, numpy, matplotlib, networkx, wordcloud pre-imported as pd, "
-            "np, plt, nx, WordCloud).\n"
+            "np, plt, nx, WordCloud; plus stdlib re, json, math, statistics, "
+            "datetime, collections, itertools, random, and Counter/defaultdict).\n"
             "The sandbox is effectively STATELESS between tool calls: never assume "
             "a variable such as `df` already exists. The script must be fully "
             "self-contained — re-read any CSV/Excel files with pandas at the top.\n"
@@ -116,7 +140,10 @@ def analytics_sandbox(code: str, feedback: str = None) -> str:
 
     Pre-imported and ready to use (no import needed): pandas as `pd`, numpy as
     `np`, matplotlib.pyplot as `plt`, networkx as `nx` (graphs/networks), and
-    `WordCloud` (from the wordcloud package, for word-cloud images).
+    `WordCloud` (from the wordcloud package, for word-cloud images). Common
+    standard-library modules are also pre-imported: `re`, `json`, `math`,
+    `statistics`, `datetime`, `collections`, `itertools`, `random`, plus
+    `Counter` and `defaultdict`. You may still `import` anything else you need.
 
     Guidelines:
     - Treat each call as a FRESH environment: do NOT rely on variables (e.g. `df`)

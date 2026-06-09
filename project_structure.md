@@ -9,7 +9,9 @@ PaperAgent/
 │   ├── main.py                   # App entrypoint: lifespan builds checkpointer + shared agent, mounts routers
 │   ├── agents/
 │   │   ├── base.py               # BaseAgent: wraps create_agent; run()/resume() one turn
+│   │   ├── tools.py              # default_tools(): shared tool list for both agents
 │   │   ├── academic_agent.py     # AcademicAgent: tools + middleware + system prompt (embeds skills.md)
+│   │   ├── deep_agent.py         # DeepResearchAgent: autonomous deepagents agent (planning + memory, no HITL)
 │   │   ├── hitl.py               # Human-in-the-loop middleware, interrupt extract/resume helpers
 │   │   └── screener_agent.py     # (legacy/standalone screener agent)
 │   ├── api/
