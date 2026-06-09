@@ -24,7 +24,7 @@ from langchain_core.tools import tool
 
 from app.core.config import settings
 
-_ARXIV_API = "http://export.arxiv.org/api/query"
+_ARXIV_API = "https://export.arxiv.org/api/query"
 _CROSSREF_API = "https://api.crossref.org/works"
 _SCOPUS_API = "https://api.elsevier.com/content/search/scopus"
 # Crossref asks for a contact in the User-Agent / mailto for the "polite pool".

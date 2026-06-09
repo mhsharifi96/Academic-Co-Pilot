@@ -9,9 +9,15 @@ remembers whether a session is currently paused awaiting human approval.
 
 import asyncio
 import concurrent.futures
+import os
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+
+# Root directory where uploads are persisted, one subdirectory per session
+# (``data/<session_id>/``).  Mirrors ``UPLOAD_ROOT`` in the ingestion endpoint;
+# kept here (rather than imported) to avoid a circular import.
+UPLOAD_ROOT = "data"
 
 
 @dataclass
@@ -55,10 +61,34 @@ class SessionManager:
                     session.files.append(path)
 
     async def get_files(self, session_id: str) -> List[str]:
-        """Return the list of file paths for a session, or empty list if none."""
+        """
+        Return the list of file paths for a session.
+
+        The in-memory store is lost on server restart, but uploaded files are
+        persisted on disk under ``data/<session_id>/``.  We rehydrate from that
+        directory so the sidebar, the ``@``-mention picker, and the agent's
+        per-turn context survive restarts and reloads of a saved session.
+        """
         async with self._lock:
-            session = self._sessions.get(session_id)
-            return list(session.files) if session else []
+            session = self._sessions.setdefault(
+                session_id, Session(session_id=session_id)
+            )
+            for path in self._scan_disk(session_id):
+                if path not in session.files:
+                    session.files.append(path)
+            return list(session.files)
+
+    @staticmethod
+    def _scan_disk(session_id: str) -> List[str]:
+        """Return the files persisted on disk for a session, sorted by name."""
+        upload_dir = os.path.join(UPLOAD_ROOT, session_id)
+        if not os.path.isdir(upload_dir):
+            return []
+        return [
+            os.path.join(upload_dir, name)
+            for name in sorted(os.listdir(upload_dir))
+            if os.path.isfile(os.path.join(upload_dir, name))
+        ]
 
     async def remove(self, session_id: str) -> None:
         """Forget a session entirely (files + pending-interrupt state)."""

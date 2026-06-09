@@ -6,6 +6,32 @@ All notable changes to this project. Format loosely follows
 ## [Unreleased]
 Work in progress on the current branch (`main`) — not yet committed. Adds the
 authentication and persistence layer on top of the original agent MVP:
+### Changed
+- **The agent now runs its whole plan autonomously by default.** New
+  `REQUIRE_TOOL_APPROVAL` setting (default `false`) controls human-in-the-loop:
+  when off, the gated tools (`analytics_sandbox`, `screen_abstracts_csv`,
+  `ingest_pdf`, `draft_paper_section`, `compile_paper`) run without pausing, so the
+  agent executes the full task end-to-end and returns the final result instead of
+  asking for approval on each step. `build_hitl_middleware()` returns `None` when
+  off (the agent omits the middleware), and the system prompt adapts to describe
+  autonomous vs. approval-gated drafting. Set `REQUIRE_TOOL_APPROVAL=true` in `.env`
+  to restore the approve/edit/reject flow.
+### Fixed
+- **`analytics_sandbox` now self-heals on error instead of giving up.** Errors from
+  the Python REPL were returned as `repr(e)` strings mislabeled `"Execution Result:"`,
+  so failures (commonly `NameError: df is not defined`, since the sandbox doesn't
+  retain variables between calls) looked like successful output and the agent would
+  ask the user to intervene. The tool now detects the error form and, on failure,
+  asks the LLM to rewrite the code as a self-contained script and reruns it — up to
+  2 retries — before reporting back. The tool docstring + `skills.md` now tell the
+  agent each call is a fresh environment, so scripts should re-read their CSVs.
+- **Uploaded files now reappear when reloading a saved session.** The file list
+  was tracked only in `SessionManager`'s in-memory store, so after a server
+  restart (or any time a session wasn't already in memory) the sidebar,
+  `@`-mention picker, and the agent's per-turn context all showed no files even
+  though the uploads still existed on disk under `data/<session_id>/`.
+  `SessionManager.get_files` now rehydrates the list from that directory, so all
+  three callers survive restarts.
 ### Added
 - **Agent task planner** (`write_plan` / `update_plan` in `app/tools/task_planner.py`):
   a self-authored todo list for multi-step jobs. The agent writes an ordered

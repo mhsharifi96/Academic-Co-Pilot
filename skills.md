@@ -41,7 +41,7 @@ This file defines the skills (tools) available to the Academic Co-Pilot Agent.
     *   `data_files` (Optional[List[str]]): Session data file paths (CSV or .xlsx) whose data should inform this section. Provide for empirical sections (Results, Methodology); omit for narrative ones (Introduction, Conclusion).
 
 ## 6. Analytics Sandbox (`analytics_sandbox`) **[Requires Approval]**
-*   **Description:** A secure Python sandbox for data analysis and visualization using pandas and matplotlib. Saves plots to the `output_figures/` directory.
+*   **Description:** A secure Python sandbox for data analysis and visualization using pandas and matplotlib. Saves plots to the `output_figures/` directory. Treat each call as a fresh environment — write self-contained scripts that re-read any CSV/Excel files (don't assume a variable like `df` survives from a previous call). If the code errors, the sandbox automatically inspects the error and retries with corrected code (up to 2 times) before reporting back.
 *   **Inputs:**
     *   `code` (str): The Python code to execute.
     *   `feedback` (Optional[str]): Extra user considerations or specific constraints for the code execution.
