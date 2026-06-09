@@ -6,16 +6,6 @@ All notable changes to this project. Format loosely follows
 ## [Unreleased]
 Work in progress on the current branch (`main`) — not yet committed. Adds the
 authentication and persistence layer on top of the original agent MVP:
-### Changed
-- **The agent now runs its whole plan autonomously by default.** New
-  `REQUIRE_TOOL_APPROVAL` setting (default `false`) controls human-in-the-loop:
-  when off, the gated tools (`analytics_sandbox`, `screen_abstracts_csv`,
-  `ingest_pdf`, `draft_paper_section`, `compile_paper`) run without pausing, so the
-  agent executes the full task end-to-end and returns the final result instead of
-  asking for approval on each step. `build_hitl_middleware()` returns `None` when
-  off (the agent omits the middleware), and the system prompt adapts to describe
-  autonomous vs. approval-gated drafting. Set `REQUIRE_TOOL_APPROVAL=true` in `.env`
-  to restore the approve/edit/reject flow.
 ### Fixed
 - **`analytics_sandbox` now self-heals on error instead of giving up.** Errors from
   the Python REPL were returned as `repr(e)` strings mislabeled `"Execution Result:"`,
@@ -66,12 +56,26 @@ authentication and persistence layer on top of the original agent MVP:
   `GuidelinesPage.jsx`.
 - Project docs: `CLAUDE.md`, `PRD.md`, `Design.md`, `project_structure.md`,
   `memory.md`, this changelog.
+- **`networkx` and `wordcloud` in the analytics sandbox**: added as project
+  dependencies and pre-imported into the `analytics_sandbox` namespace as `nx`
+  (graphs/networks) and `WordCloud` (word-cloud images), alongside `pd`/`np`/`plt`,
+  so the agent can generate network graphs and word clouds without an import step.
+  Run `uv sync` to install. Tool docstring + `skills.md` updated.
 ### Changed
 - `app/main.py` now runs `init_models()` and mounts the auth router on startup.
 - Chat/files/ingestion/sessions endpoints now require auth.
 - Frontend `App.jsx`, `api.js`, `Message.jsx`, `SessionBar.jsx`, styles updated
   for the auth flow; `frontend/src/sessions.js` removed.
 - `docker-compose.yml` / `.env.example` add `JWT_SECRET`, `ACCESS_TOKEN_EXPIRE_MINUTES`.
+- **The agent now runs its whole plan autonomously by default.** New
+  `REQUIRE_TOOL_APPROVAL` setting (default `false`) controls human-in-the-loop:
+  when off, the gated tools (`analytics_sandbox`, `screen_abstracts_csv`,
+  `ingest_pdf`, `draft_paper_section`, `compile_paper`) run without pausing, so the
+  agent executes the full task end-to-end and returns the final result instead of
+  asking for approval on each step. `build_hitl_middleware()` returns `None` when
+  off (the agent omits the middleware), and the system prompt adapts to describe
+  autonomous vs. approval-gated drafting. Set `REQUIRE_TOOL_APPROVAL=true` in `.env`
+  to restore the approve/edit/reject flow.
 
 ## [0.1.0] — 8e691de "improve ui"
 ### Changed
