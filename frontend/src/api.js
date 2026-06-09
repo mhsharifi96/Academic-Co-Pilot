@@ -57,6 +57,10 @@ export async function listFiles(sessionId) {
   return request(`/sessions/${encodeURIComponent(sessionId)}/files`);
 }
 
+export async function getPlan(sessionId) {
+  return request(`/sessions/${encodeURIComponent(sessionId)}/plan`);
+}
+
 export async function getHistory(sessionId) {
   return request(`/sessions/${encodeURIComponent(sessionId)}/history`);
 }

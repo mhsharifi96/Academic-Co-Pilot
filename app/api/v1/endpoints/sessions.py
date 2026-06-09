@@ -32,6 +32,17 @@ class SessionFilesResponse(BaseModel):
     files: List[SessionFile]
 
 
+class PlanItem(BaseModel):
+    """One step in the agent's task plan."""
+    text: str
+    status: str  # "pending" | "in_progress" | "done"
+
+
+class SessionPlanResponse(BaseModel):
+    session_id: str
+    plan: List[PlanItem]
+
+
 class SessionSummary(BaseModel):
     """A session in the user's list."""
     id: str
@@ -135,6 +146,29 @@ async def list_files(
         for p in paths
     ]
     return SessionFilesResponse(session_id=session_id, files=files)
+
+
+@router.get("/sessions/{session_id}/plan", response_model=SessionPlanResponse)
+async def get_plan(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> SessionPlanResponse:
+    """
+    Return the agent's current task plan for a session the user owns.
+
+    The plan is the agent-authored checklist (written via ``write_plan`` and
+    updated via ``update_plan``); the web UI renders it as a live progress
+    sidebar.  Empty list when the agent hasn't created a plan yet.
+    """
+    if await get_owned_session(db, current_user, session_id) is None:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    plan = await session_manager.get_plan(session_id)
+    items = [
+        PlanItem(text=item.get("text", ""), status=item.get("status", "pending"))
+        for item in plan
+    ]
+    return SessionPlanResponse(session_id=session_id, plan=items)
 
 
 @router.get("/sessions/{session_id}/history", response_model=SessionHistoryResponse)

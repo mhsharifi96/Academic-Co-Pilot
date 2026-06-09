@@ -10,26 +10,37 @@ edit / reject decision, which the API delivers via ``/chat/resume``.
 from typing import Any, Dict, List, Optional
 from langchain.agents.middleware import HumanInTheLoopMiddleware
 
+from app.core.config import settings
+
 # Tools that require explicit human approval before execution.
 # These either run arbitrary code, mutate persistent state, or produce content
 # the researcher wants to sign off on before the agent proceeds.
 #   - draft_paper_section is gated so the full-paper writing flow pauses for
 #     approval BEFORE drafting each section (approve / edit args / reject).
+#   - compile_paper writes a .docx to disk, so it is gated too.
 INTERRUPT_TOOLS = [
     "analytics_sandbox",
     "screen_abstracts_csv",
     "ingest_pdf",
     "draft_paper_section",
+    "compile_paper",
 ]
 
 
-def build_hitl_middleware() -> HumanInTheLoopMiddleware:
+def build_hitl_middleware() -> Optional[HumanInTheLoopMiddleware]:
     """
     Build the HumanInTheLoopMiddleware that interrupts before any sensitive tool.
 
     ``True`` allows all decision types (approve, edit, reject, respond) for the
     gated tool.  Tools not listed are auto-approved and run without interruption.
+
+    Returns ``None`` when ``REQUIRE_TOOL_APPROVAL`` is disabled (the default), so
+    the agent runs its whole plan autonomously and only returns the final result
+    instead of pausing for approval on each step.
     """
+    if not settings.REQUIRE_TOOL_APPROVAL:
+        return None
+
     interrupt_on: Dict[str, Any] = {name: True for name in INTERRUPT_TOOLS}
     return HumanInTheLoopMiddleware(
         interrupt_on=interrupt_on,

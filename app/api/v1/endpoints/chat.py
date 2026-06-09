@@ -11,6 +11,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.auth import User
 from app.services.session_service import ensure_session, get_owned_session
+from app.tools.task_planner import render_plan
 
 router = APIRouter()
 
@@ -33,12 +34,21 @@ def _final_text(result: Dict[str, Any]) -> str:
 
 
 async def _build_context_message(session_id: str) -> Optional[str]:
-    """Build the per-turn system context listing the session's files."""
+    """Build the per-turn system context: session id, files, and current plan."""
+    parts = [f"Current session_id: {session_id}"]
+
     files = await session_manager.get_files(session_id)
     if not files:
-        return "Session files: (none uploaded yet — the user can upload PDFs/CSVs)."
-    listed = "\n".join(f"  - {f}" for f in files)
-    return f"Files available in this session:\n{listed}"
+        parts.append("Session files: (none uploaded yet — the user can upload PDFs/CSVs).")
+    else:
+        listed = "\n".join(f"  - {f}" for f in files)
+        parts.append(f"Files available in this session:\n{listed}")
+
+    plan = await session_manager.get_plan(session_id)
+    if plan:
+        parts.append("Current task plan (update it with `update_plan` as you progress):\n" + render_plan(plan))
+
+    return "\n\n".join(parts)
 
 
 async def _to_response(result: Dict[str, Any], session_id: str) -> ChatResponse:

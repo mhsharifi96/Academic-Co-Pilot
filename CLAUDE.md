@@ -66,7 +66,7 @@ All three use the same Postgres instance but are deliberately distinct subsystem
 - `SessionManager` (in-memory singleton, `app/core/sessions.py`) — tracks **uploaded file paths** and the **pending HITL interrupt** per session. Not persisted. `sync_get_files` exists so `@tool` functions (which run synchronously inside the graph) can read files without deadlocking the asyncio lock.
 
 ### Human-in-the-loop (HITL) flow
-`app/agents/hitl.py` gates the tools in `INTERRUPT_TOOLS` (`analytics_sandbox`, `screen_abstracts_csv`, `ingest_pdf`, `draft_paper_section`) behind `HumanInTheLoopMiddleware`. Flow:
+HITL is **off by default** (`REQUIRE_TOOL_APPROVAL=false` in `app/core/config.py`): the agent runs its whole plan and returns the final result without pausing. When `REQUIRE_TOOL_APPROVAL=true`, `app/agents/hitl.py` gates the tools in `INTERRUPT_TOOLS` (`analytics_sandbox`, `screen_abstracts_csv`, `ingest_pdf`, `draft_paper_section`, `compile_paper`) behind `HumanInTheLoopMiddleware` (`build_hitl_middleware()` returns `None` when off, so the agent omits the middleware; `get_system_prompt` also adapts to describe autonomous vs. approval-gated drafting). Flow when enabled:
 1. Agent wants a gated tool → graph pauses with `__interrupt__`. `POST /chat` returns `status="interrupted"` + an `interrupt` payload (built by `extract_interrupt`), and the interrupt is stashed in `SessionManager`.
 2. Client calls `POST /chat/resume` with `approve` / `edit` (needs `edited_args`) / `reject` (optional `reason`). `build_resume_command_value` translates this into the `{"decisions": [...]}` payload the middleware expects (one decision per pending action).
 

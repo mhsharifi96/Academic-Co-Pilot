@@ -46,7 +46,14 @@ except ImportError:  # pragma: no cover
     sys.modules["pytest"] = shim
 
 
-TEST_MODULES = ["test_hitl", "test_sessions", "test_drafter_data"]
+TEST_MODULES = [
+    "test_hitl",
+    "test_sessions",
+    "test_drafter_data",
+    "test_literature",
+    "test_exporter",
+    "test_retrieval",
+]
 
 
 def main() -> int:

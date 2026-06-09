@@ -23,7 +23,10 @@ steps, and LLM tools that execute code or write files are risky to run unattende
 ## 4. Non-Goals
 - Multi-tenant scaling / horizontal session sharing (in-memory file state is per-process).
 - Non-OpenAI model providers (current build is OpenAI-only).
-- Reference-manager integrations (Zotero/Mendeley) or live web search.
+- Reference-manager integrations (Zotero/Mendeley).
+- General-purpose web browsing/search. (Scoped, read-only scholarly lookups are
+  now supported — arXiv search via `search_literature` and Crossref metadata via
+  `resolve_citation` — but open-ended web search remains out of scope.)
 
 ## 5. Users
 Academic researchers and graduate students conducting literature reviews and
@@ -45,6 +48,11 @@ writing papers, working locally (Docker) with their own OpenAI key.
 | F10 | Session file awareness ("analyze my CSV") | `list_session_files` + per-turn context | — |
 | F11 | Full-paper writing, section-by-section with approval each | drafting protocol | ✅ |
 | F12 | User auth (register/login) + per-user session ownership | JWT | — |
+| F13 | Semantic search over the ingested corpus | `search_my_papers` | — |
+| F14 | Structured TL;DR of a single PDF | `summarize_paper` | — |
+| F15 | Discover new literature on arXiv | `search_literature` | — |
+| F16 | Resolve DOI/title → metadata + BibTeX (Crossref) | `resolve_citation` | — |
+| F17 | Compile approved sections into a .docx | `compile_paper` | ✅ |
 
 ## 7. Key User Flows
 1. **Screen abstracts:** upload CSV → ask to screen against criteria → agent

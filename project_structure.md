@@ -39,7 +39,10 @@ PaperAgent/
 │       ├── planner.py            # suggest_paper_titles, generate_paper_outline, plan_paper_sections
 │       ├── drafter.py            # draft_paper_section   -> RAG draft w/ citations [gated]
 │       ├── sandbox.py            # analytics_sandbox     -> PythonREPL, saves PNGs [gated]
-│       └── file_utils.py         # get_csv_info, list_session_files
+│       ├── file_utils.py         # get_csv_info, list_session_files
+│       ├── retrieval.py          # search_my_papers, summarize_paper
+│       ├── literature.py         # search_literature (arXiv), resolve_citation (Crossref)
+│       └── exporter.py           # compile_paper        -> assembles sections to .docx [gated]
 │
 ├── frontend/                     # React + Vite SPA
 │   ├── src/
