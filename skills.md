@@ -60,3 +60,33 @@ This file defines the skills (tools) available to the Academic Co-Pilot Agent.
 *   **Description:** Parses a paper outline into a clean, ordered list of top-level section titles. Use this after generating an outline and before writing the full paper — iterate the returned list and call the RAG Drafter for each title in order so every section is covered exactly once.
 *   **Inputs:**
     *   `outline` (str): The full paper outline (e.g. from `generate_paper_outline`).
+
+## 10. Corpus Search (`search_my_papers`)
+*   **Description:** Semantic search over the papers already ingested into the vector database. Returns the most relevant passages so you can gather evidence or check what the corpus says about a topic before drafting. Read-only (no approval).
+*   **Inputs:**
+    *   `query` (str): A question or topic to search for.
+    *   `k` (int, default=5): Number of passages to return.
+
+## 11. Paper Summarizer (`summarize_paper`)
+*   **Description:** Produces a structured TL;DR of a single PDF (Problem / Method / Data / Key Findings / Limitations) without ingesting it into the vector database. Read-only (no approval).
+*   **Inputs:**
+    *   `file_path` (str): Path to the PDF file.
+    *   `feedback` (Optional[str]): Optional focus or extra considerations for the summary.
+
+## 12. Literature Search (`search_literature`)
+*   **Description:** Searches arXiv (free, no API key) for academic papers matching a query. Use this to discover relevant literature that has NOT been uploaded yet — returns title, authors, year, arXiv id/link, and an abstract snippet. Read-only (no approval).
+*   **Inputs:**
+    *   `query` (str): Search terms.
+    *   `max_results` (int, default=8): Maximum number of papers to return (capped at 25).
+
+## 13. Citation Resolver (`resolve_citation`)
+*   **Description:** Resolves a DOI or paper title to clean citation metadata (authors, year, venue, DOI) plus a BibTeX entry via Crossref (free, no API key). Use this to ground citations in real metadata instead of guessing. Read-only (no approval).
+*   **Inputs:**
+    *   `doi_or_title` (str): A DOI (e.g. `10.1145/3539618`) or a paper title.
+
+## 14. Document Compiler (`compile_paper`) **[Requires Approval]**
+*   **Description:** Assembles drafted sections into a single Word (.docx) document under `data/`, downloadable via the `/download` endpoint. Use after the user has approved the individual sections.
+*   **Inputs:**
+    *   `title` (str): The paper title (used as document heading and filename).
+    *   `sections` (List[Dict]): Ordered sections, each `{"heading": str, "body": str}`.
+    *   `output_path` (Optional[str]): Path for the .docx. Defaults to `data/<slug>.docx`.

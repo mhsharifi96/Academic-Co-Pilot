@@ -15,11 +15,13 @@ from langchain.agents.middleware import HumanInTheLoopMiddleware
 # the researcher wants to sign off on before the agent proceeds.
 #   - draft_paper_section is gated so the full-paper writing flow pauses for
 #     approval BEFORE drafting each section (approve / edit args / reject).
+#   - compile_paper writes a .docx to disk, so it is gated too.
 INTERRUPT_TOOLS = [
     "analytics_sandbox",
     "screen_abstracts_csv",
     "ingest_pdf",
     "draft_paper_section",
+    "compile_paper",
 ]
 
 

@@ -17,6 +17,9 @@ from app.tools.planner import (
 from app.tools.drafter import draft_paper_section
 from app.tools.sandbox import analytics_sandbox
 from app.tools.file_utils import get_csv_info, list_session_files
+from app.tools.retrieval import search_my_papers, summarize_paper
+from app.tools.literature import search_literature, resolve_citation
+from app.tools.exporter import compile_paper
 
 
 def _load_skills() -> str:
@@ -62,6 +65,11 @@ class AcademicAgent(BaseAgent):
                 analytics_sandbox,
                 get_csv_info,
                 list_session_files,
+                search_my_papers,
+                summarize_paper,
+                search_literature,
+                resolve_citation,
+                compile_paper,
             ]
 
         self.skills_content = _load_skills()
@@ -97,10 +105,16 @@ class AcademicAgent(BaseAgent):
             "when the user refers to their files.\n"
             "- Always call `get_csv_info` before writing analytics code for a CSV "
             "so you know the exact column names and data types.\n"
+            "- To gather evidence, use `search_my_papers` (semantic search over "
+            "already-ingested PDFs), `search_literature` (discover new papers on "
+            "arXiv), and `resolve_citation` (fetch clean citation metadata/BibTeX "
+            "from a DOI or title). Use `summarize_paper` for a quick TL;DR of a "
+            "single PDF without ingesting it. These are read-only and run without "
+            "approval.\n"
             "- The tools `analytics_sandbox`, `screen_abstracts_csv`, `ingest_pdf`, "
-            "and `draft_paper_section` require human approval before they run; "
-            "proceed to call them when appropriate and the system will handle the "
-            "approval step.\n\n"
+            "`draft_paper_section`, and `compile_paper` require human approval "
+            "before they run; proceed to call them when appropriate and the system "
+            "will handle the approval step.\n\n"
             "Writing a full paper (section by section with approval):\n"
             "When the user asks you to write the full/whole paper, follow this "
             "protocol strictly:\n"
@@ -120,6 +134,8 @@ class AcademicAgent(BaseAgent):
             "(e.g. Introduction, Conclusion).\n"
             "5. If the user rejects a section, adapt per their reason; if they "
             "edit the args, honor the edit. After every section is approved, "
-            "present the assembled full paper in order.\n\n"
+            "present the assembled full paper in order. If the user wants a "
+            "downloadable document, call `compile_paper` with the approved "
+            "sections to produce a .docx (this also pauses for approval).\n\n"
             "- Always be professional, precise, and adhere to academic standards."
         )

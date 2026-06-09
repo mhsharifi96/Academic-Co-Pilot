@@ -7,6 +7,14 @@ All notable changes to this project. Format loosely follows
 Work in progress on the current branch (`main`) — not yet committed. Adds the
 authentication and persistence layer on top of the original agent MVP:
 ### Added
+- **Five new agent tools**:
+  - `search_my_papers` + `summarize_paper` (`app/tools/retrieval.py`) — semantic
+    search over the ingested corpus and a structured single-PDF TL;DR.
+  - `search_literature` (arXiv) + `resolve_citation` (Crossref) (`app/tools/literature.py`)
+    — scoped scholarly lookups, no API key. Reverses the prior "no web search" non-goal.
+  - `compile_paper` (`app/tools/exporter.py`) — assembles approved sections into a
+    `.docx`; HITL-gated (added to `INTERRUPT_TOOLS`).
+  - New deps: `httpx`, `python-docx`. Tools registered in `AcademicAgent`.
 - **JWT authentication**: `app/core/security.py`, `app/api/v1/endpoints/auth.py`
   (register/login), `User` + `ChatSession` ORM models (`app/models/auth.py`).
 - **Per-user session ownership**: `app/services/session_service.py`; chat/session
