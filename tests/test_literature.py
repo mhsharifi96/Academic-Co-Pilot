@@ -12,6 +12,9 @@ from app.tools.literature import (
     _bibtex_key,
     _parse_scopus_results,
     _scopus_link,
+    _parse_openalex_results,
+    _reconstruct_abstract,
+    _openalex_short_id,
 )
 
 
@@ -145,3 +148,78 @@ def test_parse_scopus_empty_error_entry_is_skipped():
 
 def test_parse_scopus_missing_results_key():
     assert _parse_scopus_results({}) == []
+
+
+# --------------------------------------------------------------------------- #
+# OpenAlex
+# --------------------------------------------------------------------------- #
+_OPENALEX_RESPONSE = {
+    "results": [
+        {
+            "id": "https://openalex.org/W123",
+            "doi": "https://doi.org/10.1000/xyz123",
+            "title": "Agentic RAG: A Survey",
+            "publication_year": 2025,
+            "cited_by_count": 21,
+            "type": "preprint",
+            "authorships": [
+                {"author": {"display_name": "Aditi Singh"}},
+                {"author": {"display_name": "Alan Turing"}},
+            ],
+            "primary_location": {"source": {"display_name": "ArXiv.org"}},
+            "open_access": {"oa_status": "green", "oa_url": "https://x/y.pdf"},
+            # "Knowledge graphs help." stored inverted.
+            "abstract_inverted_index": {"Knowledge": [0], "graphs": [1], "help.": [2]},
+        }
+    ]
+}
+
+
+def test_reconstruct_abstract_orders_by_position():
+    inv = {"the": [0, 3], "cat": [1], "sat": [2], "mat": [4]}
+    assert _reconstruct_abstract(inv) == "the cat sat the mat"
+
+
+def test_reconstruct_abstract_empty():
+    assert _reconstruct_abstract({}) == ""
+    assert _reconstruct_abstract(None) == ""
+
+
+def test_openalex_short_id():
+    assert _openalex_short_id("https://openalex.org/W4406542750") == "W4406542750"
+    assert _openalex_short_id("") == ""
+
+
+def test_parse_openalex_extracts_fields():
+    papers = _parse_openalex_results(_OPENALEX_RESPONSE)
+    assert len(papers) == 1
+    p = papers[0]
+    assert p["title"] == "Agentic RAG: A Survey"
+    assert p["authors"] == "Aditi Singh, Alan Turing"
+    assert p["year"] == "2025"
+    assert p["venue"] == "ArXiv.org"
+    assert p["doi"] == "10.1000/xyz123"          # https://doi.org/ prefix stripped
+    assert p["cited_by"] == "21"
+    assert p["oa_status"] == "green"
+    assert p["id"] == "W123"                       # short id
+    assert p["link"] == "https://openalex.org/W123"
+    assert p["abstract"] == "Knowledge graphs help."
+
+
+def test_parse_openalex_caps_long_author_lists():
+    authorships = [{"author": {"display_name": f"Author {i}"}} for i in range(12)]
+    data = {"results": [{"id": "https://openalex.org/W9", "authorships": authorships}]}
+    p = _parse_openalex_results(data)[0]
+    assert p["authors"].endswith(", et al.")
+    assert p["authors"].count(",") == 8  # 8 names + the trailing ", et al."
+
+
+def test_parse_openalex_missing_results_key():
+    assert _parse_openalex_results({}) == []
+
+
+def test_parse_openalex_handles_null_title_and_citations():
+    data = {"results": [{"id": "https://openalex.org/W1", "title": None}]}
+    p = _parse_openalex_results(data)[0]
+    assert p["title"] == "(untitled)"
+    assert p["cited_by"] == ""        # no cited_by_count -> empty, not "None"

@@ -47,6 +47,16 @@ via `ChatSession.agent_type` (`"academic"|"deep"`), chosen in the UI before the
 first message and immutable thereafter — so a given `thread_id` is only ever
 driven by one graph type, avoiding checkpoint state-schema clashes.
 
+### 1b. Central LLM/image repository (provider seam)
+`app/repositories/llm.py` (`llm_repo`) is the one place model calls should flow
+through, so the model/provider is swappable in a single file. It exposes two chat
+tiers — `default` (`settings.OPENAI_MODEL`, the agents' cheap everyday model) and
+`powerful` (`settings.POWERFUL_MODEL`, e.g. gpt-5.5, for high-stakes tools like
+`validate_references` and `humanize_text`) — plus `generate_image()` (OpenAI
+`settings.IMAGE_MODEL`, used by `generate_infographic`). The older agents/tools
+still construct `ChatOpenAI` directly; they were left as-is to avoid touching core
+paths, and new code prefers the repository.
+
 ### 2. Three separate Postgres-backed stores (deliberately distinct)
 Same database, three independent subsystems — **do not conflate them**:
 | Store | Module | Driver | Holds |

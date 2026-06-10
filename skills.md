@@ -104,3 +104,33 @@ This file defines the skills (tools) available to the Academic Co-Pilot Agent.
 *   **Inputs:**
     *   `query` (str): Search terms or a Scopus boolean query.
     *   `max_results` (int, default=10): Maximum number of results (capped at 25).
+
+## 17. OpenAlex Search (`search_openalex`)
+*   **Description:** Searches OpenAlex — a broad open catalog of ~250M scholarly works across all disciplines — for papers matching a query. Complements arXiv (`search_literature`) and Scopus (`search_scopus`) with wide, openly-licensed coverage; returns title, authors, year, venue, citation count, open-access status/link (when available), DOI, the OpenAlex id, and an abstract snippet. Ranked by relevance. Runs keyless for light/testing use; set `OPENALEX_API_KEY` on the server (a free key from openalex.org grants $1 of usage/day) for reliable use — reports a friendly message when the keyless allowance is exhausted. Read-only (no approval).
+*   **Inputs:**
+    *   `query` (str): Search terms, matched against title/abstract/full text.
+    *   `max_results` (int, default=8): Maximum number of works (capped at 25).
+
+## 18. Reference Checker (`validate_references`)
+*   **Description:** Audits the references in a paper on two axes: (1) every DOI/URL is resolved over the network so dead or fabricated links are flagged, and (2) a *powerful* model checks that each reference looks real and that the in-text claims citing it are actually supported — flagging likely hallucinated or mis-attributed citations. Use before finalizing a paper or to vet drafts. Read-only (no approval).
+*   **Inputs:**
+    *   `paper_text` (str): The paper/section text, including its reference list.
+    *   `references` (str, optional): The reference list, if not already in `paper_text`.
+
+## 19. Text Humanizer (`humanize_text`)
+*   **Description:** Rewrites text (typically AI-drafted) so it reads as natural, varied human prose — reducing AI-writing-detector signals — while strictly preserving meaning, facts, numbers, and citations. Uses a *powerful* model. Read-only (no approval).
+*   **Inputs:**
+    *   `text` (str): The text to humanize.
+    *   `tone` (str, default='academic'): Desired tone/register.
+
+## 20. Infographic Generator (`generate_infographic`) **[Requires Approval]**
+*   **Description:** Turns a brief (abstract, findings, key points) into an infographic image. A model first designs a layout prompt, then an image model (`IMAGE_MODEL`, default `gpt-image-1`) renders it; the PNG is saved under `output_figures/`. On-image text is kept short (image models render long text imperfectly). Writes a file → gated by approval when enabled.
+*   **Inputs:**
+    *   `brief` (str): What the infographic should convey.
+    *   `title` (str, optional): Title to feature on the infographic.
+
+## 21. Venue Suggester (`suggest_venues`)
+*   **Description:** Suggests journals, conferences, and publishers to submit to, by aggregating where the most relevant existing papers were published (via OpenAlex). Returns ranked venues with type, publisher, number of matching papers, and average citations. Read-only (no approval).
+*   **Inputs:**
+    *   `topic_or_abstract` (str): The paper's topic, title, or abstract.
+    *   `max_results` (int, default=10): Maximum venues to suggest (capped at 20).

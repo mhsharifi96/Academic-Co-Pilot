@@ -54,6 +54,9 @@ TEST_MODULES = [
     "test_exporter",
     "test_retrieval",
     "test_deep_agent_tools",
+    "test_reference_checker",
+    "test_venue_suggester",
+    "test_llm_repo",
 ]
 
 

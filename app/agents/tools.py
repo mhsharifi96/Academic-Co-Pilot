@@ -22,8 +22,17 @@ from app.tools.drafter import draft_paper_section
 from app.tools.sandbox import analytics_sandbox
 from app.tools.file_utils import get_csv_info, list_session_files
 from app.tools.retrieval import search_my_papers, summarize_paper
-from app.tools.literature import search_literature, resolve_citation, search_scopus
+from app.tools.literature import (
+    search_literature,
+    resolve_citation,
+    search_scopus,
+    search_openalex,
+)
 from app.tools.exporter import compile_paper
+from app.tools.reference_checker import validate_references
+from app.tools.humanizer import humanize_text
+from app.tools.infographic import generate_infographic
+from app.tools.venue_suggester import suggest_venues
 from app.tools.task_planner import write_plan, update_plan
 
 
@@ -43,7 +52,12 @@ _CORE_TOOLS: List[BaseTool] = [
     search_literature,
     resolve_citation,
     search_scopus,
+    search_openalex,
     compile_paper,
+    validate_references,
+    humanize_text,
+    generate_infographic,
+    suggest_venues,
 ]
 
 

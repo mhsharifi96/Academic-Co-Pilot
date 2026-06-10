@@ -29,7 +29,12 @@ over re-scanning the codebase. For depth see `Design.md`, `PRD.md`,
 5. **Config validates at import** — `app/core/config.py` requires `OPENAI_API_KEY`
    + `DATABASE_URL`. Tests set dummies in `conftest.py` BEFORE imports.
 6. **skills.md is in the system prompt** — keep it synced with registered tools.
+   New tools register once in `app/agents/tools.py:default_tools` (both agents).
 7. **Screening CSVs need `title` + `abstract` columns.**
+8. **LLM/image calls have a central seam** — `app/repositories/llm.py`
+   (`llm_repo`): tiers `default` (`OPENAI_MODEL`) vs `powerful` (`POWERFUL_MODEL`,
+   e.g. gpt-5.5) + `generate_image` (`IMAGE_MODEL`). New code should call it;
+   the older agents/tools still build `ChatOpenAI` directly. Swap providers here.
 
 ## Commands (uv-managed, not pip)
 - Full stack: `docker-compose up --build`  (UI :5173, API :8000, docs :8000/docs)

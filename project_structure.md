@@ -35,6 +35,8 @@ PaperAgent/
 │   │   └── auth.py               # ORM: User, ChatSession
 │   ├── services/
 │   │   └── session_service.py    # ChatSession ownership CRUD
+│   ├── repositories/             # provider-agnostic external-service seams
+│   │   └── llm.py                # LLMRepository: chat (default/powerful tiers) + generate_image
 │   └── tools/                    # LangChain @tool functions (the agent's skills)
 │       ├── screener.py           # screen_abstracts_csv  -> color-coded .xlsx  [gated]
 │       ├── ingestor.py           # ingest_pdf            -> chunks into pgvector [gated]
@@ -43,7 +45,11 @@ PaperAgent/
 │       ├── sandbox.py            # analytics_sandbox     -> PythonREPL, saves PNGs [gated]
 │       ├── file_utils.py         # get_csv_info, list_session_files
 │       ├── retrieval.py          # search_my_papers, summarize_paper
-│       ├── literature.py         # search_literature (arXiv), resolve_citation (Crossref)
+│       ├── literature.py         # search_literature (arXiv), resolve_citation (Crossref), search_scopus, search_openalex
+│       ├── reference_checker.py  # validate_references   -> link + faithfulness audit (powerful model)
+│       ├── humanizer.py          # humanize_text         -> natural rewrite (powerful model)
+│       ├── infographic.py        # generate_infographic  -> infographic PNG via image model [gated]
+│       ├── venue_suggester.py    # suggest_venues        -> journals/conferences/publishers (OpenAlex)
 │       └── exporter.py           # compile_paper        -> assembles sections to .docx [gated]
 │
 ├── frontend/                     # React + Vite SPA

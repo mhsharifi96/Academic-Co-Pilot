@@ -23,6 +23,37 @@ authentication and persistence layer on top of the original agent MVP:
   `SessionManager.get_files` now rehydrates the list from that directory, so all
   three callers survive restarts.
 ### Added
+- **Provider-agnostic LLM repository + 4 new tools (on both agents).** New
+  `app/repositories/llm.py` (`LLMRepository` / `llm_repo`) is the single seam for
+  chat + image model calls, with two tiers — `default` (`OPENAI_MODEL`) and
+  `powerful` (`POWERFUL_MODEL`, default `gpt-5.5`) — plus `generate_image()` (OpenAI
+  `IMAGE_MODEL`, default `gpt-image-1`). Swap providers by editing this one file.
+  New config: `POWERFUL_MODEL`, `IMAGE_MODEL`. Four new `@tool`s registered via
+  `app/agents/tools.py:default_tools` (so academic **and** deep agents get them):
+  - `validate_references` — resolves every DOI/URL and uses the powerful model to
+    flag broken links and hallucinated / mis-attributed citations.
+  - `humanize_text` — powerful-model rewrite for natural, human-sounding prose
+    (reduces AI-detection signal) while preserving facts and citations.
+  - `generate_infographic` — designs a prompt then renders an infographic PNG to
+    `output_figures/`; **added to `INTERRUPT_TOOLS`** (writes a file).
+  - `suggest_venues` — recommends journals/conferences/publishers by aggregating
+    where similar papers were published (via OpenAlex).
+  Pure helpers are unit-tested offline (`tests/test_reference_checker.py`,
+  `tests/test_venue_suggester.py`, `tests/test_llm_repo.py`); documented in
+  `skills.md` and `.env.example`.
+- **OpenAlex literature search (`search_openalex`).** A new tool in
+  `app/tools/literature.py` that searches OpenAlex (~250M scholarly works) and
+  returns title, authors, year, venue, citation count, open-access status/link,
+  DOI, OpenAlex id, and an abstract snippet (reconstructed from OpenAlex's
+  `abstract_inverted_index`). Registered on **both** agents via
+  `app/agents/tools.py:default_tools` and trims payloads with the API `select`
+  param. OpenAlex requires an API key for non-trivial use as of 2026-02-13 (the
+  old `mailto` polite pool was retired), so the tool sends the optional
+  `OPENALEX_API_KEY` when set, runs keyless for light/testing use, and returns a
+  friendly message on 401/403/409/429 (allowance exhausted / rate-limited). Pure
+  parse helpers (`_parse_openalex_results`, `_reconstruct_abstract`) are
+  unit-tested offline in `tests/test_literature.py`. Documented in `skills.md`,
+  `.env.example`, and both agents' system prompts.
 - **License: PolyForm Noncommercial 1.0.0.** Added a `LICENSE` file (© 2026
   mhsharifi96) making the project source-available for noncommercial use only —
   personal, research, education, and non-profit use is permitted; commercial use

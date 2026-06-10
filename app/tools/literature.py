@@ -8,11 +8,14 @@ External literature tools (read-only, network-backed).
     citations in real metadata instead of guessing.
   - ``search_scopus`` searches Elsevier's Scopus (requires ``ELSEVIER_API_KEY``)
     for peer-reviewed/indexed literature with citation counts.
+  - ``search_openalex`` searches OpenAlex — a broad open catalog of ~250M
+    scholarly works with citation counts and open-access links. Keyless for light
+    use; set ``OPENALEX_API_KEY`` (free, $1/day) for reliable use.
 
 The XML/JSON parsing is factored into pure helpers (``_parse_arxiv_atom`` /
-``_format_crossref_work`` / ``_parse_scopus_results``) so it can be unit-tested
-offline. Network and parse errors are caught and returned as strings — tools must
-never raise into the LangGraph run.
+``_format_crossref_work`` / ``_parse_scopus_results`` / ``_parse_openalex_results``)
+so it can be unit-tested offline. Network and parse errors are caught and returned
+as strings — tools must never raise into the LangGraph run.
 """
 
 import re
@@ -312,5 +315,149 @@ def search_scopus(query: str, max_results: int = 10) -> str:
             f"{i}. {p['title']} ({p['year']}){cited}\n"
             f"   Author: {p['author'] or '(n/a)'}  —  {p['venue'] or '(n/a)'}\n"
             f"   {p['link']}{doi}"
+        )
+    return "\n\n".join(blocks)
+
+
+# --------------------------------------------------------------------------- #
+# OpenAlex
+# --------------------------------------------------------------------------- #
+_OPENALEX_API = "https://api.openalex.org/works"
+# Trim the (large) work objects to just the fields we surface.
+_OPENALEX_SELECT = (
+    "id,doi,title,publication_year,cited_by_count,type,authorships,"
+    "primary_location,open_access,abstract_inverted_index"
+)
+
+
+def _openalex_short_id(work_id: str) -> str:
+    """'https://openalex.org/W123' -> 'W123' (the human-friendly OpenAlex id)."""
+    return work_id.rsplit("/", 1)[-1] if work_id else ""
+
+
+def _reconstruct_abstract(inverted_index: Dict) -> str:
+    """
+    Rebuild plain abstract text from OpenAlex's ``abstract_inverted_index``
+    (``{word: [positions...]}``). Pure (no network) so it can be tested offline.
+    """
+    if not inverted_index:
+        return ""
+    positions: Dict[int, str] = {}
+    for word, idxs in inverted_index.items():
+        for i in idxs:
+            positions[i] = word
+    return " ".join(positions[i] for i in sorted(positions))
+
+
+def _parse_openalex_results(data: Dict) -> List[Dict[str, str]]:
+    """
+    Parse an OpenAlex ``/works`` JSON response into normalized dicts.
+    Pure (no network) so it can be tested offline.
+    """
+    results = data.get("results", []) or []
+    papers: List[Dict[str, str]] = []
+    for w in results:
+        names = [
+            ((a.get("author") or {}).get("display_name") or "").strip()
+            for a in (w.get("authorships") or [])
+        ]
+        names = [n for n in names if n]
+        # Cap very long author lists so the tool output stays readable.
+        authors = (
+            ", ".join(names[:8]) + ", et al." if len(names) > 8 else ", ".join(names)
+        )
+        source = (w.get("primary_location") or {}).get("source") or {}
+        doi = (w.get("doi") or "")
+        if doi.startswith("https://doi.org/"):
+            doi = doi[len("https://doi.org/"):]
+        oa = w.get("open_access") or {}
+        cited = w.get("cited_by_count")
+        papers.append({
+            "title": (w.get("title") or "(untitled)").strip(),
+            "authors": authors,
+            "year": str(w.get("publication_year") or ""),
+            "venue": (source.get("display_name") or "").strip(),
+            "doi": doi,
+            "cited_by": str(cited) if cited is not None else "",
+            "oa_status": (oa.get("oa_status") or ""),
+            "oa_url": (oa.get("oa_url") or ""),
+            "id": _openalex_short_id(w.get("id") or ""),
+            "link": (w.get("id") or ""),
+            "abstract": _reconstruct_abstract(w.get("abstract_inverted_index")),
+        })
+    return papers
+
+
+@tool
+def search_openalex(query: str, max_results: int = 8) -> str:
+    """
+    Search OpenAlex — an open catalog of ~250M scholarly works across all
+    disciplines — for papers matching a query. Works keyless for light/testing
+    use; set OPENALEX_API_KEY on the server (a free key grants $1 of usage/day)
+    for reliable use.
+
+    Complements the other discovery tools: arXiv (`search_literature`) covers
+    preprints, Scopus (`search_scopus`) covers an indexed/entitled subset, while
+    OpenAlex offers broad, openly-licensed coverage with citation counts and
+    open-access links. Returns title, authors, year, venue, citation count, an
+    open-access status/link when available, DOI, the OpenAlex id, and an abstract
+    snippet. Results are ranked by relevance to the query.
+
+    Args:
+        query: Search terms (e.g. 'agentic RAG for legal compliance'). Matched
+            against title, abstract, and full text.
+        max_results: Maximum number of works to return (default 8, capped at 25).
+    """
+    params = {
+        "search": query,
+        "per-page": max(1, min(max_results, 25)),
+        "select": _OPENALEX_SELECT,
+    }
+    # Since 2026-02-13 OpenAlex requires an API key for non-trivial use (the old
+    # `mailto` polite pool was retired). Send the key when configured; without it
+    # a few calls still work for testing before OpenAlex returns 409.
+    if settings.OPENALEX_API_KEY:
+        params["api_key"] = settings.OPENALEX_API_KEY
+    try:
+        resp = httpx.get(
+            _OPENALEX_API, params=params, timeout=20.0,
+            headers={"User-Agent": _USER_AGENT},
+        )
+        resp.raise_for_status()
+        papers = _parse_openalex_results(resp.json())
+    except httpx.HTTPStatusError as e:
+        code = e.response.status_code
+        if code in (401, 403, 409, 429):
+            return (
+                "OpenAlex declined the request (likely the keyless testing "
+                "allowance is exhausted or rate-limited). Set OPENALEX_API_KEY in "
+                "the server environment — a free key from "
+                "https://openalex.org/settings/api-key grants $1 of usage per day."
+            )
+        return f"Error searching OpenAlex (HTTP {code})."
+    except Exception as e:
+        return f"Error searching OpenAlex: {str(e)}"
+
+    if not papers:
+        return f"No OpenAlex works found for {query!r}. Try broader or different terms."
+
+    blocks = [f"Found {len(papers)} OpenAlex works for {query!r}:\n"]
+    for i, p in enumerate(papers, 1):
+        cited = f"  (cited by {p['cited_by']})" if p["cited_by"] else ""
+        oa = (
+            f"  [{p['oa_status']} OA]"
+            if p["oa_status"] and p["oa_status"] != "closed"
+            else ""
+        )
+        doi = f"  DOI: {p['doi']}" if p["doi"] else ""
+        if p["abstract"]:
+            snippet = p["abstract"][:300] + ("…" if len(p["abstract"]) > 300 else "")
+        else:
+            snippet = "(no abstract available)"
+        blocks.append(
+            f"{i}. {p['title']} ({p['year']}){cited}{oa}\n"
+            f"   Authors: {p['authors'] or '(n/a)'}\n"
+            f"   Venue: {p['venue'] or '(n/a)'}  —  OpenAlex: {p['id']}{doi}\n"
+            f"   Abstract: {snippet}"
         )
     return "\n\n".join(blocks)
