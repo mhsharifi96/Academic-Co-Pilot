@@ -1,0 +1,13 @@
+# Caddy fetches and renews a Let's Encrypt TLS certificate automatically.
+# IMPORTANT (Cloudflare): for Caddy to obtain a cert via the HTTP-01 challenge,
+# the DNS record for academic.hiagent.me must be "DNS only" (grey cloud) at
+# first, OR Cloudflare's SSL/TLS mode must be "Full (strict)". See notes below.
+{
+	email mh.sh7676@gmail.com
+}
+
+academic.hiagent.me {
+	# All traffic (SPA + /api) goes to the frontend nginx, which serves the
+	# built React bundle and reverse-proxies /api to the app container.
+	reverse_proxy frontend:80
+}

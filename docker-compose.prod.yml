@@ -1,0 +1,80 @@
+# Production stack. Run with:
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Differences vs. the dev docker-compose.yml:
+#   - Caddy terminates TLS on :80/:443 and reverse-proxies to the frontend
+#     (automatic Let's Encrypt certificates — set your domain in ./Caddyfile).
+#   - db and app ports are NOT published to the host; they're only reachable on
+#     the internal compose network. Only Caddy faces the public internet.
+#   - app runs the image's production CMD (uvicorn, no --reload) and does NOT
+#     bind-mount the source tree. Only ./data and ./output_figures are mounted
+#     so generated artifacts (the downloadable .docx/.xlsx/figures) survive
+#     container restarts.
+#   - restart: unless-stopped on every long-lived service.
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: paper_agent_db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-paper_agent}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-paper_agent}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: paper_agent_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-paper_agent}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-10080}
+      - LANGCHAIN_API_KEY=${LANGSMITH_API_KEY}
+      - LANGCHAIN_TRACING_V2=${LANGSMITH_TRACING:-true}
+      - LANGCHAIN_ENDPOINT=${LANGSMITH_ENDPOINT:-https://api.smith.langchain.com}
+      - LANGCHAIN_PROJECT=${LANGSMITH_PROJECT:-paper-agent}
+    volumes:
+      - ./data:/app/data
+      - ./output_figures:/app/output_figures
+    depends_on:
+      db:
+        condition: service_healthy
+    # No command override -> uses the Dockerfile CMD (uvicorn, no --reload).
+
+  frontend:
+    build: ./frontend
+    container_name: paper_agent_ui
+    restart: unless-stopped
+    ports:
+      - "5176:80"
+    depends_on:
+      - app
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: paper_agent_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
