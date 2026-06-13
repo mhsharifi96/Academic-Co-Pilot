@@ -5,6 +5,9 @@ from typing import Any, Dict, Literal, Optional
 class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None  # Auto-generated if not provided
+    # Which agent to use for a NEW session: "academic" (default) or "deep".
+    # Ignored for existing sessions (the agent is bound at creation time).
+    agent_type: Optional[Literal["academic", "deep"]] = None
 
 
 class ResumeRequest(BaseModel):

@@ -24,6 +24,7 @@ INTERRUPT_TOOLS = [
     "ingest_pdf",
     "draft_paper_section",
     "compile_paper",
+    "generate_infographic",  # writes a PNG to output_figures/
 ]
 
 

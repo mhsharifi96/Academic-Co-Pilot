@@ -10,6 +10,7 @@ derived from the same ``DATABASE_URL`` used elsewhere.
 """
 
 from typing import AsyncGenerator
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -52,3 +53,13 @@ async def init_models() -> None:
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # ``create_all`` never ALTERs an existing table, so add columns that were
+        # introduced after a table first shipped. Postgres supports IF NOT EXISTS,
+        # making this a safe no-op on fresh and already-migrated databases alike.
+        await conn.execute(
+            text(
+                "ALTER TABLE chat_sessions "
+                "ADD COLUMN IF NOT EXISTS agent_type VARCHAR "
+                "NOT NULL DEFAULT 'academic'"
+            )
+        )

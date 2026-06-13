@@ -1,12 +1,14 @@
 import os
 import re
+import io
+import textwrap
+import contextlib
 import pandas as pd
 import matplotlib.pyplot as plt
 from typing import Any, Dict
 from langchain_core.tools import tool
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_openai import ChatOpenAI
-from langchain_experimental.utilities.python import PythonREPL
 from app.core.config import settings
 
 # Ensure output directory exists
@@ -26,24 +28,64 @@ class SecurePythonREPL:
         import networkx as nx
         from wordcloud import WordCloud
 
-        namespace = {
-            "__builtins__": __builtins__,
+        # Handy general-purpose standard-library modules, also pre-seeded so the
+        # agent can use them without an explicit import. (Imports still work too,
+        # since __builtins__ is exposed below.)
+        import json
+        import math
+        import statistics
+        import datetime
+        import collections
+        import itertools
+        import random
+        from collections import Counter, defaultdict
+
+        # Base namespace seeded with the common libraries. Each run() gets a
+        # FRESH copy so scripts stay self-contained (no state leaks across calls).
+        self._seed: Dict[str, Any] = {
             "pd": pd,
             "np": np,
             "plt": plt,
             "nx": nx,
             "WordCloud": WordCloud,
+            # General-purpose stdlib helpers.
+            "re": re,
+            "json": json,
+            "math": math,
+            "statistics": statistics,
+            "datetime": datetime,
+            "collections": collections,
+            "itertools": itertools,
+            "random": random,
+            "Counter": Counter,
+            "defaultdict": defaultdict,
         }
-        # CRITICAL: use the SAME dict for globals and locals. PythonREPL calls
-        # exec(code, globals, locals); with two distinct dicts, top-level imports
-        # land in `locals` but functions/lambdas/comprehensions resolve free names
-        # against `globals` only -> intermittent "NameError: name 'pd' is not
-        # defined" inside .apply()/comprehensions even after a successful import.
-        self.repl = PythonREPL(_globals=namespace, _locals=namespace)
 
     def run(self, code: str) -> str:
-        # Pre-execution checks or setup can go here
-        return self.repl.run(code)
+        # Execute with a SINGLE namespace dict for BOTH globals and locals.
+        # This is critical: `exec(code, globals, locals)` with two *different*
+        # dicts puts a script's top-level assignments (e.g. `KW_STOP = {...}`)
+        # into `locals`, while any function / lambda / comprehension the script
+        # defines resolves its free names against `globals` only -> the script
+        # dies with `NameError: name 'KW_STOP' is not defined` even though it
+        # clearly defined it. `exec(code, ns)` (one dict, module semantics) makes
+        # top-level names visible everywhere, exactly like a real Python script.
+        #
+        # NOTE: we deliberately do NOT use langchain_experimental's PythonREPL
+        # here — being a Pydantic model, it copies each of its globals/locals
+        # fields into separate dicts, silently re-introducing the split above.
+        ns: Dict[str, Any] = {"__builtins__": __builtins__, **self._seed}
+        cleaned = _strip_code_fences(textwrap.dedent(code))
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buf):
+                exec(cleaned, ns)
+        except Exception as e:
+            # Mirror the old PythonREPL contract: return the one-line exception
+            # repr (e.g. NameError("...")) so the self-heal loop's error
+            # detection keeps working unchanged.
+            return repr(e)
+        return buf.getvalue()
 
 python_repl = SecurePythonREPL()
 
@@ -86,7 +128,8 @@ def _repair_code(code: str, error: str) -> str:
         system = (
             "You are a Python debugging assistant for a data-analysis sandbox "
             "(pandas, numpy, matplotlib, networkx, wordcloud pre-imported as pd, "
-            "np, plt, nx, WordCloud).\n"
+            "np, plt, nx, WordCloud; plus stdlib re, json, math, statistics, "
+            "datetime, collections, itertools, random, and Counter/defaultdict).\n"
             "The sandbox is effectively STATELESS between tool calls: never assume "
             "a variable such as `df` already exists. The script must be fully "
             "self-contained — re-read any CSV/Excel files with pandas at the top.\n"
@@ -116,7 +159,10 @@ def analytics_sandbox(code: str, feedback: str = None) -> str:
 
     Pre-imported and ready to use (no import needed): pandas as `pd`, numpy as
     `np`, matplotlib.pyplot as `plt`, networkx as `nx` (graphs/networks), and
-    `WordCloud` (from the wordcloud package, for word-cloud images).
+    `WordCloud` (from the wordcloud package, for word-cloud images). Common
+    standard-library modules are also pre-imported: `re`, `json`, `math`,
+    `statistics`, `datetime`, `collections`, `itertools`, `random`, plus
+    `Counter` and `defaultdict`. You may still `import` anything else you need.
 
     Guidelines:
     - Treat each call as a FRESH environment: do NOT rely on variables (e.g. `df`)

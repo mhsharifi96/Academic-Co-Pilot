@@ -22,6 +22,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [draft, setDraft] = useState("");
   const [view, setView] = useState("chat"); // "chat" | "guidelines"
+  const [agentType, setAgentType] = useState("academic"); // "academic" | "deep"
 
   // Drop back to the login screen if any request reports the token expired.
   useEffect(() => {
@@ -67,6 +68,7 @@ export default function App() {
       setFiles(listed.files || []);
       setPlan(planResp.plan || []);
       setInterrupt(hist.interrupted ? hist.interrupt : null);
+      setAgentType(hist.agent_type || "academic");
     } catch (e) {
       setError(e.message);
     } finally {
@@ -107,7 +109,7 @@ export default function App() {
       setDraft("");
       setLoading(true);
       try {
-        const resp = await api.sendChat(trimmed, sessionId);
+        const resp = await api.sendChat(trimmed, sessionId, agentType);
         const sid = applyResponse(resp);
         refreshSessions(); // backend upserts the session row (title/updated_at)
         refreshPlan(sid || sessionId); // the agent may have written/updated its plan
@@ -117,7 +119,7 @@ export default function App() {
         setLoading(false);
       }
     },
-    [sessionId, loading, applyResponse, refreshSessions, refreshPlan]
+    [sessionId, loading, applyResponse, refreshSessions, refreshPlan, agentType]
   );
 
   const handleResume = useCallback(
@@ -170,6 +172,7 @@ export default function App() {
     setInterrupt(null);
     setError(null);
     setDraft("");
+    setAgentType("academic");
     setView("chat");
   }, []);
 
@@ -279,6 +282,9 @@ export default function App() {
               interrupt={interrupt}
               loading={loading}
               onResume={handleResume}
+              agentType={agentType}
+              onAgentTypeChange={setAgentType}
+              agentLocked={messages.length > 0 || !!sessionId}
             />
             <MessageInput
               value={draft}

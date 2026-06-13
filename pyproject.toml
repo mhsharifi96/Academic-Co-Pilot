@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "End-to-End Academic Co-Pilot"
 readme = "README.md"
 requires-python = ">=3.11"
+license = "PolyForm-Noncommercial-1.0.0"
+license-files = ["LICENSE"]
 dependencies = [
     "fastapi>=0.111.0",
     "uvicorn[standard]>=0.30.0",
@@ -16,6 +18,7 @@ dependencies = [
     "langgraph>=1.2.0",
     "langgraph-checkpoint>=4.1.0",
     "langgraph-checkpoint-postgres>=2.0.0",
+    "deepagents>=0.2.0",
     "openai>=1.30.0",
     "psycopg2-binary>=2.9.9",
     "psycopg[binary,pool]>=3.1",

@@ -21,6 +21,12 @@ services:
     container_name: paper_agent_app
     ports:
       - "8000:8000"
+    # Load everything from .env (OPENAI_MODEL, POWERFUL_MODEL, IMAGE_MODEL,
+    # CROSSREF_MAILTO, ELSEVIER_API_KEY, OPENALEX_API_KEY, REQUIRE_TOOL_APPROVAL,
+    # ENVIRONMENT, ...). The explicit `environment:` keys below override these
+    # (e.g. DATABASE_URL points at the `db` service host, not localhost).
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-paper_agent}
       - OPENAI_API_KEY=${OPENAI_API_KEY}

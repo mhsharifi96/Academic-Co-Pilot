@@ -17,13 +17,24 @@ over re-scanning the codebase. For depth see `Design.md`, `PRD.md`,
 2. **Two "session" things** — `ChatSession` DB row (ownership/title) vs in-memory
    `SessionManager` (files + pending interrupt). `session_id == thread_id == ChatSession.id`.
 3. **One shared agent** built in `app/main.py` `lifespan`, on `app.state.agent`.
+   A second, independent **deep agent** (`deepagents.create_deep_agent`,
+   `app/agents/deep_agent.py`) is built on `app.state.deep_agent`. Each session is
+   bound to one of them by `ChatSession.agent_type` (`"academic"|"deep"`), chosen
+   in the UI **before** the first message and immutable after. The deep agent is
+   autonomous: built-in `write_todos` planning + virtual-fs memory, **no HITL**.
+   Both share the tool set (`app/agents/tools.py:default_tools`) and checkpointer.
 4. **HITL gating** — tools in `INTERRUPT_TOOLS` (`app/agents/hitl.py`:
    `analytics_sandbox`, `screen_abstracts_csv`, `ingest_pdf`, `draft_paper_section`)
    pause for approve/edit/reject via `/chat/resume`.
 5. **Config validates at import** — `app/core/config.py` requires `OPENAI_API_KEY`
    + `DATABASE_URL`. Tests set dummies in `conftest.py` BEFORE imports.
 6. **skills.md is in the system prompt** — keep it synced with registered tools.
+   New tools register once in `app/agents/tools.py:default_tools` (both agents).
 7. **Screening CSVs need `title` + `abstract` columns.**
+8. **LLM/image calls have a central seam** — `app/repositories/llm.py`
+   (`llm_repo`): tiers `default` (`OPENAI_MODEL`) vs `powerful` (`POWERFUL_MODEL`,
+   e.g. gpt-5.5) + `generate_image` (`IMAGE_MODEL`). New code should call it;
+   the older agents/tools still build `ChatOpenAI` directly. Swap providers here.
 
 ## Commands (uv-managed, not pip)
 - Full stack: `docker-compose up --build`  (UI :5173, API :8000, docs :8000/docs)

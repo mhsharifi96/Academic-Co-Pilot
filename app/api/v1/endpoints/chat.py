@@ -16,9 +16,10 @@ from app.tools.task_planner import render_plan
 router = APIRouter()
 
 
-def _get_agent(request: Request):
-    """Return the shared agent built during the app lifespan."""
-    agent = getattr(request.app.state, "agent", None)
+def _get_agent(request: Request, agent_type: str = "academic"):
+    """Return the shared agent for ``agent_type`` ("academic" | "deep")."""
+    attr = "deep_agent" if agent_type == "deep" else "agent"
+    agent = getattr(request.app.state, attr, None)
     if agent is None:
         raise HTTPException(status_code=503, detail="Agent is not ready yet.")
     return agent
@@ -91,17 +92,24 @@ async def chat(
     comes back with ``status="interrupted"`` — approve or reject via
     ``POST /chat/resume``.
     """
-    agent = _get_agent(http_request)
     session_id = request.session_id or str(uuid.uuid4())
 
     # Create or verify ownership of this session, and title it from the first
-    # message.  PermissionError → the session belongs to someone else.
+    # message.  PermissionError → the session belongs to someone else.  The
+    # agent_type is recorded on creation and bound to the session thereafter.
     try:
-        await ensure_session(
-            db, current_user, session_id, title=request.message.strip()[:120]
+        cs = await ensure_session(
+            db,
+            current_user,
+            session_id,
+            title=request.message.strip()[:120],
+            agent_type=request.agent_type,
         )
     except PermissionError:
         raise HTTPException(status_code=404, detail="Session not found.")
+
+    # Always honour the session's bound agent, ignoring any mismatching request.
+    agent = _get_agent(http_request, cs.agent_type)
 
     await session_manager.get_or_create(session_id)
 
@@ -132,11 +140,13 @@ async def resume(
     - ``edit``: run the tool with ``edited_args`` instead.
     - ``reject``: skip the tool; ``reason`` is passed back to the agent.
     """
-    agent = _get_agent(http_request)
-
     # Must own the session being resumed.
-    if await get_owned_session(db, current_user, request.session_id) is None:
+    owned = await get_owned_session(db, current_user, request.session_id)
+    if owned is None:
         raise HTTPException(status_code=404, detail="Session not found.")
+    # Resume on the session's bound agent (deep sessions never interrupt, but
+    # this keeps the selection correct regardless).
+    agent = _get_agent(http_request, owned.agent_type)
 
     pending = await session_manager.get_pending_interrupt(request.session_id)
     if not pending:

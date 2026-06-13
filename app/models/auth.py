@@ -45,6 +45,13 @@ class ChatSession(Base):
         ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )
     title: Mapped[str] = mapped_column(String, default="New chat")
+    # Which agent drives this session: "academic" (default) or "deep".
+    # Bound at session creation (chosen in the UI before the first message) and
+    # immutable thereafter — a thread is only ever run by the agent it was made
+    # with, which keeps the two graphs' checkpoint state schemas from clashing.
+    agent_type: Mapped[str] = mapped_column(
+        String, default="academic", server_default="academic", nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, onupdate=_now

@@ -6,6 +6,7 @@ from app.api.v1.endpoints import chat, ingestion, sessions, files, auth
 from app.core.checkpointer import build_checkpointer_cm
 from app.core.database import init_models
 from app.agents.academic_agent import AcademicAgent
+from app.agents.deep_agent import DeepResearchAgent
 
 
 @asynccontextmanager
@@ -25,7 +26,12 @@ async def lifespan(app: FastAPI):
         await saver.setup()
 
         app.state.checkpointer = saver
+        # Two independent agents share one checkpointer; each session is bound to
+        # one of them by ``ChatSession.agent_type`` (chosen in the UI before the
+        # first message). The deep agent runs autonomously (planning + memory,
+        # no human-in-the-loop).
         app.state.agent = AcademicAgent(checkpointer=saver)
+        app.state.deep_agent = DeepResearchAgent(checkpointer=saver)
         yield
     # Saver / connection pool closed here by the context manager.
 

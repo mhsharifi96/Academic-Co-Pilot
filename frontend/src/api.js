@@ -32,10 +32,15 @@ async function request(path, { method = "GET", body, isForm = false } = {}) {
   return data;
 }
 
-export async function sendChat(message, sessionId) {
+export async function sendChat(message, sessionId, agentType) {
   return request("/chat", {
     method: "POST",
-    body: { message, session_id: sessionId || undefined },
+    body: {
+      message,
+      session_id: sessionId || undefined,
+      // Only honoured when starting a new session; ignored otherwise.
+      agent_type: agentType || undefined,
+    },
   });
 }
 
