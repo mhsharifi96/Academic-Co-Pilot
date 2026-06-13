@@ -2,13 +2,22 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 class Settings(BaseSettings):
+    # Deployment environment: "development" (default) or "production". Use this
+    # to gate environment-specific behavior (stricter defaults, disabled debug,
+    # etc.). Set ENVIRONMENT=production in .env for production deployments.
+    ENVIRONMENT: str = "development"
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT.lower() == "production"
+
     # OpenAI Configuration
     OPENAI_API_KEY: str
-    OPENAI_MODEL: str = "gpt-5.4-mini"
+    OPENAI_MODEL: str = "gpt-5.4-nano"
     # A stronger model for high-stakes tools (reference checking, humanizing) that
     # need better reasoning than the agents' cheap everyday model. Routed via the
     # "powerful" tier in app/repositories/llm.py.
-    POWERFUL_MODEL: str = "gpt-5.5"
+    POWERFUL_MODEL: str = "gpt-5.4-mini"
     # Image model used by the LLM repository's generate_image() (infographics).
     IMAGE_MODEL: str = "gpt-image-1"
 

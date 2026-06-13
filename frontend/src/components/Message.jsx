@@ -29,7 +29,7 @@ function linkifyArtifacts(text) {
   // `?\.?/?(data|output_figures)/…ext`?  — optionally backtick/`./`-wrapped,
   // with an optional preceding `](` (markdown link target) we must preserve.
   const re =
-    /(\]\()?`?\.?\/?((?:data|output_figures)\/[^\s`)\]]+\.(?:png|jpe?g|gif|svg|webp|csv|xlsx?|pdf|txt|json|md))`?/gi;
+    /(\]\()?`?\.?\/?((?:data|output_figures)\/[^\s`)\]]+\.(?:png|jpe?g|gif|svg|webp|csv|xlsx?|pdf|docx?|pptx?|txt|json|md))`?/gi;
   return text.replace(re, (match, linkPrefix, path) => {
     if (linkPrefix) return match; // already a markdown link target — leave it
     const name = path.split("/").pop();
