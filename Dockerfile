@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-ENV UV_INDEX_URL=https://mirror.abrha.net/repository/pypi/simple
+# ENV UV_INDEX_URL=https://mirror.abrha.net/repository/pypi/simple
 ENV UV_COMPILE_BYTECODE=1
 
 COPY pyproject.toml ./
