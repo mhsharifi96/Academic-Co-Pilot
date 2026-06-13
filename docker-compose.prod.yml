@@ -1,11 +1,16 @@
 # Production stack. Run with:
 #   docker compose -f docker-compose.prod.yml up -d --build
 #
+# This server already runs a host-level nginx that owns ports 80/443 and serves
+# multiple sites, so this stack does NOT run its own Caddy/TLS. Instead the
+# frontend is published on 127.0.0.1:5176 (localhost only) and the host nginx
+# reverse-proxies academic.hiagent.me -> 127.0.0.1:5176 (see deploy/nginx-academic.conf).
+#
 # Differences vs. the dev docker-compose.yml:
-#   - Caddy terminates TLS on :80/:443 and reverse-proxies to the frontend
-#     (automatic Let's Encrypt certificates — set your domain in ./Caddyfile).
 #   - db and app ports are NOT published to the host; they're only reachable on
-#     the internal compose network. Only Caddy faces the public internet.
+#     the internal compose network.
+#   - frontend is published on 127.0.0.1:5176 (not 0.0.0.0) so only the host
+#     nginx can reach it, never the public internet directly.
 #   - app runs the image's production CMD (uvicorn, no --reload) and does NOT
 #     bind-mount the source tree. Only ./data and ./output_figures are mounted
 #     so generated artifacts (the downloadable .docx/.xlsx/figures) survive
@@ -56,25 +61,11 @@ services:
     container_name: paper_agent_ui
     restart: unless-stopped
     ports:
-      - "5176:80"
+      # Bind to localhost only — the host nginx proxies to this; the public
+      # never reaches it directly.
+      - "127.0.0.1:5176:80"
     depends_on:
       - app
 
-  caddy:
-    image: caddy:2-alpine
-    container_name: paper_agent_caddy
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - frontend
-
 volumes:
   postgres_data:
-  caddy_data:
-  caddy_config:
