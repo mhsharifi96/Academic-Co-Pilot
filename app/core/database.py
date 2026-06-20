@@ -63,3 +63,19 @@ async def init_models() -> None:
                 "NOT NULL DEFAULT 'academic'"
             )
         )
+        # Per-user balance / admin flag, added after the users table first
+        # shipped. Same IF NOT EXISTS pattern — safe on fresh and existing DBs.
+        await conn.execute(
+            text(
+                "ALTER TABLE users "
+                "ADD COLUMN IF NOT EXISTS balance DOUBLE PRECISION "
+                "NOT NULL DEFAULT 0.5"
+            )
+        )
+        await conn.execute(
+            text(
+                "ALTER TABLE users "
+                "ADD COLUMN IF NOT EXISTS is_admin BOOLEAN "
+                "NOT NULL DEFAULT FALSE"
+            )
+        )

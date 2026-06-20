@@ -28,6 +28,21 @@ function store(token, user) {
   localStorage.setItem(USER_KEY, JSON.stringify(user));
 }
 
+// Persist an updated user object (e.g. after the balance changes) without
+// touching the token. Returns the stored user.
+export function setUser(user) {
+  if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+  return user;
+}
+
+// Merge partial fields (e.g. {balance}) into the stored user and persist.
+export function patchUser(patch) {
+  const current = getUser() || {};
+  const merged = { ...current, ...patch };
+  localStorage.setItem(USER_KEY, JSON.stringify(merged));
+  return merged;
+}
+
 export function logout() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);

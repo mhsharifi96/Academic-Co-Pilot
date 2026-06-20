@@ -31,6 +31,19 @@ over re-scanning the codebase. For depth see `Design.md`, `PRD.md`,
 6. **skills.md is in the system prompt** — keep it synced with registered tools.
    New tools register once in `app/agents/tools.py:default_tools` (both agents).
 7. **Screening CSVs need `title` + `abstract` columns.**
+7b. **Per-user balance + guardrails** (added on `prod`):
+   - `User.balance` (USD, default `DEFAULT_USER_BALANCE=0.5`) + `User.is_admin`.
+     `BaseAgent.run`/`resume` now return `(result, usage)`; the chat endpoint bills
+     via `app/services/billing_service.py` and writes `usage_records`. Balance ≤
+     `MIN_BALANCE_TO_CHAT` → HTTP 402. Toggle `ENABLE_BILLING`. New `users` columns
+     added by `init_models` `ALTER ... IF NOT EXISTS`.
+   - First account to register becomes admin. Admin API in
+     `app/api/v1/endpoints/admin.py` (`get_current_admin`); UI in `AdminPage.jsx`.
+   - Guardrail in `app/agents/guardrails.py` (`screen_message`): keyword rules +
+     cheap LLM classifier, runs in the chat endpoint BEFORE the agent, **fails
+     open**, blocks off-topic/jailbreak with `status="blocked"` (not billed).
+     Toggle `ENABLE_GUARDRAILS`. Both agent prompts also have a "Scope & safety"
+     section.
 8. **LLM/image calls have a central seam** — `app/repositories/llm.py`
    (`llm_repo`): tiers `default` (`OPENAI_MODEL`) vs `powerful` (`POWERFUL_MODEL`,
    e.g. gpt-5.5) + `generate_image` (`IMAGE_MODEL`). New code should call it;

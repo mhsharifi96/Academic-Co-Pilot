@@ -8,6 +8,7 @@ import PlanSidebar from "./components/PlanSidebar.jsx";
 import ChatWindow from "./components/ChatWindow.jsx";
 import MessageInput from "./components/MessageInput.jsx";
 import GuidelinesPage from "./components/GuidelinesPage.jsx";
+import AdminPage from "./components/AdminPage.jsx";
 import LoginPage from "./components/LoginPage.jsx";
 
 export default function App() {
@@ -21,7 +22,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [draft, setDraft] = useState("");
-  const [view, setView] = useState("chat"); // "chat" | "guidelines"
+  const [view, setView] = useState("chat"); // "chat" | "guidelines" | "admin"
   const [agentType, setAgentType] = useState("academic"); // "academic" | "deep"
 
   // Drop back to the login screen if any request reports the token expired.
@@ -52,6 +53,27 @@ export default function App() {
   useEffect(() => {
     if (user) refreshSessions();
   }, [user, refreshSessions]);
+
+  // Refresh the fresh profile (balance + admin flag) on login, so a user who
+  // logged in before these fields existed — or whose balance changed on the
+  // server — sees current values.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const me = await api.fetchMe();
+        if (!cancelled && me) setUser(auth.setUser(me));
+      } catch {
+        /* non-fatal: keep the stored user */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Only on auth transitions, not on every balance tweak.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   // Fetch a session's transcript + files and load it into view.
   const loadSession = useCallback(async (sid) => {
@@ -89,6 +111,10 @@ export default function App() {
 
   const applyResponse = useCallback((resp) => {
     if (resp.session_id) setSessionId(resp.session_id);
+    // Reflect the balance the server billed this turn, if returned.
+    if (typeof resp.balance === "number") {
+      setUser((u) => (u ? auth.patchUser({ balance: resp.balance }) : u));
+    }
     if (resp.status === "interrupted") {
       setInterrupt(resp.interrupt || null);
     } else {
@@ -254,6 +280,8 @@ export default function App() {
 
       {view === "guidelines" ? (
         <GuidelinesPage onBack={() => setView("chat")} />
+      ) : view === "admin" && user?.is_admin ? (
+        <AdminPage onBack={() => setView("chat")} currentUserId={user.id} />
       ) : (
         <>
           <aside className="sidebar">

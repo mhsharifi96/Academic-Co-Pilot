@@ -6,6 +6,30 @@ All notable changes to this project. Format loosely follows
 ## [Unreleased]
 Work in progress on the current branch (`main`) — not yet committed. Adds the
 authentication and persistence layer on top of the original agent MVP:
+### Added
+- **Per-user balance + usage billing.** Each account now has a `balance` (USD,
+  default `$0.50`, configurable via `DEFAULT_USER_BALANCE`). Every chat/resume
+  turn measures its token usage (`BaseAgent.run`/`resume` now wrap the graph
+  invoke in `get_usage_metadata_callback` and return `(result, usage)`), converts
+  it to a dollar cost (`COST_INPUT_PER_1M` / `COST_OUTPUT_PER_1M`), deducts it
+  from the user (`app/services/billing_service.py`), and writes an audit row to
+  the new `usage_records` table. A user at/below `MIN_BALANCE_TO_CHAT` is blocked
+  with HTTP 402. The billed balance is returned on `ChatResponse.balance` and
+  shown live in the top bar. Toggle the whole thing with `ENABLE_BILLING`.
+- **Admin console for managing balances.** New `is_admin` flag on `User`
+  (the first account to register becomes admin). New admin-only endpoints
+  (`app/api/v1/endpoints/admin.py`): `GET /admin/users`, `PATCH /admin/users/{id}`
+  (set balance / toggle admin), `POST /admin/users/{id}/adjust-balance`. Gated by
+  the new `get_current_admin` dependency. New `AdminPage.jsx` (linked from the top
+  bar for admins) lists users and edits balances inline / with quick-credit buttons.
+- **Agent guardrails.** Every incoming message is screened before the agent runs
+  (`app/agents/guardrails.py`): fast keyword/regex rules catch obvious
+  prompt-injection/jailbreak phrasings, then a cheap LLM classifier decides
+  whether the request is in-scope (academic research) and free of
+  jailbreak/system-abuse intent. Blocked messages return `status="blocked"` with a
+  polite refusal and are never billed; the screen *fails open* on classifier
+  errors. Both agents' system prompts also gained a non-negotiable "Scope &
+  safety" section. Toggle with `ENABLE_GUARDRAILS`.
 ### Fixed
 - **`analytics_sandbox` now self-heals on error instead of giving up.** Errors from
   the Python REPL were returned as `repr(e)` strings mislabeled `"Execution Result:"`,

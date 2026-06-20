@@ -84,3 +84,27 @@ export async function renameSession(sessionId, title) {
     body: { title },
   });
 }
+
+// ----- Account / admin -----
+
+export async function fetchMe() {
+  return request("/auth/me");
+}
+
+export async function listUsers() {
+  return request("/admin/users");
+}
+
+export async function updateUser(userId, { balance, isAdmin } = {}) {
+  return request(`/admin/users/${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    body: { balance, is_admin: isAdmin },
+  });
+}
+
+export async function adjustBalance(userId, amount) {
+  return request(`/admin/users/${encodeURIComponent(userId)}/adjust-balance`, {
+    method: "POST",
+    body: { amount },
+  });
+}

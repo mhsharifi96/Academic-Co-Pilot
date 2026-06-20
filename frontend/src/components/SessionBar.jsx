@@ -32,6 +32,14 @@ export default function SessionBar({
         >
           Guidelines
         </button>
+        {user?.is_admin && (
+          <button
+            className={`nav-link${view === "admin" ? " active" : ""}`}
+            onClick={() => onNavigate("admin")}
+          >
+            Admin
+          </button>
+        )}
       </nav>
 
       <div className="session-meta">
@@ -41,6 +49,14 @@ export default function SessionBar({
         >
           {shortId}
         </span>
+        {user && typeof user.balance === "number" && (
+          <span
+            className={`user-balance${user.balance <= 0 ? " empty" : ""}`}
+            title="Remaining balance"
+          >
+            ${user.balance.toFixed(3)}
+          </span>
+        )}
         {user && <span className="user-email" title={user.email}>{user.email}</span>}
         <button className="ghost" onClick={onLogout}>
           Log out

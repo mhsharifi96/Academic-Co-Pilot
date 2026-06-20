@@ -164,6 +164,133 @@ body {
   white-space: nowrap;
 }
 
+.user-balance {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--green);
+  background: rgba(46, 204, 113, 0.14);
+  border: 1px solid rgba(46, 204, 113, 0.4);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.user-balance.empty {
+  color: var(--red);
+  background: rgba(255, 92, 108, 0.14);
+  border-color: rgba(255, 92, 108, 0.4);
+}
+
+/* ---------- Admin page ---------- */
+.admin-page {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  overflow-y: auto;
+  padding: 32px 24px;
+  display: flex;
+  justify-content: center;
+}
+
+.admin-inner {
+  max-width: 900px;
+  width: 100%;
+}
+
+.admin-inner .back-btn {
+  margin-bottom: 18px;
+}
+
+.admin-inner h1 {
+  margin-top: 0;
+}
+
+.admin-sub {
+  color: var(--muted);
+  margin: -6px 0 18px;
+  font-size: 13px;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.admin-table th,
+.admin-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.admin-table th {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 11px;
+  background: var(--panel-2);
+}
+
+.admin-table tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-email {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.you-tag {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  background: rgba(91, 140, 255, 0.18);
+  padding: 1px 6px;
+  border-radius: 5px;
+}
+
+.balance-input {
+  width: 110px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 5px 8px;
+}
+.balance-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.admin-badge-btn {
+  font-size: 12px;
+  padding: 4px 12px;
+  background: transparent;
+  color: var(--muted);
+}
+.admin-badge-btn.on {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(91, 140, 255, 0.12);
+}
+
+.admin-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.admin-actions button {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
 /* ---------- Login screen ---------- */
 .login-screen {
   min-height: 100vh;

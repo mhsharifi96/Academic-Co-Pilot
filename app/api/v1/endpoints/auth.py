@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -25,6 +26,17 @@ class Credentials(BaseModel):
 class UserOut(BaseModel):
     id: str
     email: EmailStr
+    balance: float
+    is_admin: bool
+
+
+def _user_out(user: User) -> "UserOut":
+    return UserOut(
+        id=user.id,
+        email=user.email,
+        balance=user.balance,
+        is_admin=user.is_admin,
+    )
 
 
 class TokenResponse(BaseModel):
@@ -41,13 +53,22 @@ async def register(creds: Credentials, db: AsyncSession = Depends(get_db)):
             status_code=status.HTTP_409_CONFLICT,
             detail="An account with this email already exists.",
         )
-    user = User(email=creds.email, hashed_password=hash_password(creds.password))
+    # The very first account to register becomes the admin so the deployment is
+    # manageable out of the box (subsequent admins are granted from the admin UI).
+    is_first_user = (
+        await db.scalar(select(func.count()).select_from(User))
+    ) == 0
+    user = User(
+        email=creds.email,
+        hashed_password=hash_password(creds.password),
+        is_admin=is_first_user,
+    )
     db.add(user)
     await db.commit()
     await db.refresh(user)
     return TokenResponse(
         access_token=create_access_token(user.id),
-        user=UserOut(id=user.id, email=user.email),
+        user=_user_out(user),
     )
 
 
@@ -61,10 +82,10 @@ async def login(creds: Credentials, db: AsyncSession = Depends(get_db)):
         )
     return TokenResponse(
         access_token=create_access_token(user.id),
-        user=UserOut(id=user.id, email=user.email),
+        user=_user_out(user),
     )
 
 
 @router.get("/auth/me", response_model=UserOut)
 async def me(current_user: User = Depends(get_current_user)):
-    return UserOut(id=current_user.id, email=current_user.email)
+    return _user_out(current_user)

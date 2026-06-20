@@ -50,6 +50,32 @@ class Settings(BaseSettings):
     # returns the final result. Set REQUIRE_TOOL_APPROVAL=true in .env to gate.
     REQUIRE_TOOL_APPROVAL: bool = False
 
+    # ---- Per-user balance / usage billing ----------------------------------
+    # When True, every chat turn deducts its measured token cost from the
+    # user's balance, and a user whose balance is exhausted is blocked from
+    # chatting until an admin tops them up. Set ENABLE_BILLING=false to disable
+    # metering entirely (useful for local development / the test suite).
+    ENABLE_BILLING: bool = True
+    # Dollars granted to a brand-new account.
+    DEFAULT_USER_BALANCE: float = 0.5
+    # A user is blocked from starting a new turn once balance <= this value.
+    MIN_BALANCE_TO_CHAT: float = 0.0
+    # Token prices in USD per 1,000,000 tokens, used to convert measured token
+    # usage into a dollar cost. Defaults are sensible for the cheap "nano" tier;
+    # override per deployment to match the actual model pricing.
+    COST_INPUT_PER_1M: float = 0.15
+    COST_OUTPUT_PER_1M: float = 0.60
+
+    # ---- Agent guardrails ---------------------------------------------------
+    # When True, each incoming user message is screened (fast keyword rules +
+    # an LLM classifier) before the agent runs. Off-topic requests and prompt-
+    # injection / jailbreak / system-abuse attempts are refused without ever
+    # reaching the agent. Set ENABLE_GUARDRAILS=false to disable.
+    ENABLE_GUARDRAILS: bool = True
+    # Model used by the guardrail classifier. Falls back to OPENAI_MODEL when
+    # unset — keep it cheap, this runs on every message.
+    GUARDRAIL_MODEL: Optional[str] = None
+
     # LangSmith Configuration
     LANGCHAIN_TRACING_V2: bool = True
     LANGCHAIN_ENDPOINT: Optional[str] = None

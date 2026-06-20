@@ -21,7 +21,10 @@ class ResumeRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
     session_id: str
-    status: Literal["complete", "interrupted"] = "complete"
+    status: Literal["complete", "interrupted", "blocked"] = "complete"
     # Populated only when status == "interrupted": the tool(s) awaiting approval.
     interrupt: Optional[Dict[str, Any]] = None
     output: Optional[Any] = None
+    # The user's remaining balance (USD) after this turn was billed, when
+    # billing is enabled. Lets the UI update the balance without a refetch.
+    balance: Optional[float] = None

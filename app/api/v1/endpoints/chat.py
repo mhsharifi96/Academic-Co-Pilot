@@ -6,10 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.chat import ChatRequest, ChatResponse, ResumeRequest
 from app.agents.hitl import extract_interrupt, build_resume_command_value
+from app.agents.guardrails import screen_message, REFUSAL_MESSAGE
+from app.core.config import settings
 from app.core.sessions import session_manager
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.auth import User
+from app.services.billing_service import charge_usage, has_sufficient_balance
 from app.services.session_service import ensure_session, get_owned_session
 from app.tools.task_planner import render_plan
 
@@ -52,7 +55,9 @@ async def _build_context_message(session_id: str) -> Optional[str]:
     return "\n\n".join(parts)
 
 
-async def _to_response(result: Dict[str, Any], session_id: str) -> ChatResponse:
+async def _to_response(
+    result: Dict[str, Any], session_id: str, balance: Optional[float] = None
+) -> ChatResponse:
     """Turn a graph result into a ChatResponse, handling HITL interrupts."""
     interrupt = extract_interrupt(result)
     if interrupt:
@@ -63,6 +68,7 @@ async def _to_response(result: Dict[str, Any], session_id: str) -> ChatResponse:
             status="interrupted",
             interrupt=interrupt,
             output=None,
+            balance=balance,
         )
 
     # Completed normally — clear any stale interrupt marker.
@@ -72,6 +78,7 @@ async def _to_response(result: Dict[str, Any], session_id: str) -> ChatResponse:
         session_id=session_id,
         status="complete",
         output=None,
+        balance=balance,
     )
 
 
@@ -111,11 +118,32 @@ async def chat(
     # Always honour the session's bound agent, ignoring any mismatching request.
     agent = _get_agent(http_request, cs.agent_type)
 
+    # Guardrail: refuse off-topic / jailbreak / abuse attempts before the agent
+    # runs (and before any balance is spent).
+    verdict = await screen_message(request.message)
+    if not verdict.allowed:
+        return ChatResponse(
+            response=REFUSAL_MESSAGE,
+            session_id=session_id,
+            status="blocked",
+            balance=current_user.balance if settings.ENABLE_BILLING else None,
+        )
+
+    # Balance gate: block when the user is already out of credit.
+    if not has_sufficient_balance(current_user):
+        raise HTTPException(
+            status_code=402,
+            detail=(
+                "Your balance is exhausted. Please contact an administrator to "
+                "top up your account before continuing."
+            ),
+        )
+
     await session_manager.get_or_create(session_id)
 
     try:
         context_message = await _build_context_message(session_id)
-        result = await agent.run(
+        result, usage = await agent.run(
             request.message,
             session_id=session_id,
             context_message=context_message,
@@ -123,7 +151,10 @@ async def chat(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Agent Error: {str(e)}")
 
-    return await _to_response(result, session_id)
+    balance = await charge_usage(db, current_user, usage, session_id)
+    return await _to_response(
+        result, session_id, balance if settings.ENABLE_BILLING else None
+    )
 
 
 @router.post("/chat/resume", response_model=ChatResponse)
@@ -169,8 +200,11 @@ async def resume(
     )
 
     try:
-        result = await agent.resume(request.session_id, resume_value)
+        result, usage = await agent.resume(request.session_id, resume_value)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Agent Resume Error: {str(e)}")
 
-    return await _to_response(result, request.session_id)
+    balance = await charge_usage(db, current_user, usage, request.session_id)
+    return await _to_response(
+        result, request.session_id, balance if settings.ENABLE_BILLING else None
+    )
