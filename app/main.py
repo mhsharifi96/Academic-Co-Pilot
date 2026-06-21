@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.endpoints import chat, ingestion, sessions, files, auth, admin
 from app.core.checkpointer import build_checkpointer_cm
-from app.core.database import init_models
+from app.core.database import init_models, bootstrap_admin
 from app.agents.academic_agent import AcademicAgent
 from app.agents.deep_agent import DeepResearchAgent
 
@@ -19,6 +19,8 @@ async def lifespan(app: FastAPI):
     """
     # Application tables (users, chat_sessions).
     await init_models()
+    # Promote the configured ADMIN_EMAIL to admin if that account exists.
+    await bootstrap_admin()
 
     cm = build_checkpointer_cm()
     async with cm as saver:

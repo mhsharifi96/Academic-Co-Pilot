@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     # hits the limit. Get a free key at https://openalex.org/settings/api-key
     OPENALEX_API_KEY: Optional[str] = None
 
+    # When set, the user who registers with this email is automatically granted
+    # admin on startup (idempotent), so a production deployment has a guaranteed
+    # admin regardless of registration order. The account must still register
+    # normally first; this only flips its is_admin flag. Leave unset to rely on
+    # the "first account to register becomes admin" fallback in auth.register.
+    ADMIN_EMAIL: Optional[str] = None
+
     # Authentication (JWT)
     JWT_SECRET: str = "change-me-in-production"
     JWT_ALGORITHM: str = "HS256"

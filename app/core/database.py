@@ -46,6 +46,30 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
+async def bootstrap_admin() -> None:
+    """Grant admin to ``settings.ADMIN_EMAIL`` if that user exists.
+
+    Called once on startup, after ``init_models``. Idempotent and order-
+    independent: the designated account still registers normally, and this just
+    flips its ``is_admin`` flag so a production deployment always has a known
+    admin regardless of who registered first. No-op when ``ADMIN_EMAIL`` is
+    unset or the matching user hasn't registered yet.
+    """
+    if not settings.ADMIN_EMAIL:
+        return
+
+    from sqlalchemy import select
+
+    from app.models.auth import User
+
+    email = settings.ADMIN_EMAIL.strip()
+    async with AsyncSessionLocal() as session:
+        user = await session.scalar(select(User).where(User.email == email))
+        if user is not None and not user.is_admin:
+            user.is_admin = True
+            await session.commit()
+
+
 async def init_models() -> None:
     """Create application tables if they don't exist (called on startup)."""
     # Import models so they're registered on Base.metadata before create_all.
