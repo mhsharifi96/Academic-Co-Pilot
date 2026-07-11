@@ -85,6 +85,25 @@ export async function renameSession(sessionId, title) {
   });
 }
 
+// ----- Provider PDF downloads -----
+
+// Queue a PDF download for a DOI, attaching the result to the conversation.
+// Throws with the server message on quota (429) / invalid DOI (400).
+export async function createDownload(sessionId, doi) {
+  return request("/downloads", {
+    method: "POST",
+    body: { session_id: sessionId, doi },
+  });
+}
+
+export async function getDownload(jobId) {
+  return request(`/downloads/${encodeURIComponent(jobId)}`);
+}
+
+export async function listDownloads(sessionId) {
+  return request(`/downloads?session_id=${encodeURIComponent(sessionId)}`);
+}
+
 // ----- Account / admin -----
 
 export async function fetchMe() {

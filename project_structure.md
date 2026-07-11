@@ -23,6 +23,7 @@ PaperAgent/
 │   │       ├── chat.py           # /chat, /chat/resume  (the core endpoint)
 │   │       ├── ingestion.py      # PDF ingestion endpoint
 │   │       ├── files.py          # /upload (multi-file PDF/CSV)
+│   │       ├── downloads.py       # /downloads (provider PDF download queue: create/status/list)
 │   │       └── sessions.py       # list/rename/delete chat sessions + session files
 │   ├── core/
 │   │   ├── config.py             # pydantic-settings; validates env at import time
@@ -30,11 +31,14 @@ PaperAgent/
 │   │   ├── db.py                 # Vector store: PGVector (sync psycopg2) + OpenAI embeddings
 │   │   ├── checkpointer.py       # LangGraph AsyncPostgresSaver / InMemorySaver factory
 │   │   ├── security.py           # JWT + bcrypt, get_current_user dependency
+│   │   ├── download_worker.py    # Single background worker draining the PDF download queue
 │   │   └── sessions.py           # In-memory SessionManager (files + pending interrupts)
 │   ├── models/
-│   │   └── auth.py               # ORM: User, ChatSession
+│   │   ├── auth.py               # ORM: User, ChatSession, UsageRecord
+│   │   └── downloads.py          # ORM: DownloadJob (PDF download queue)
 │   ├── services/
-│   │   └── session_service.py    # ChatSession ownership CRUD
+│   │   ├── session_service.py    # ChatSession ownership CRUD
+│   │   └── download_service.py   # Quota/scheduling/fairness/retry (pure fns) + DB wrappers
 │   ├── repositories/             # provider-agnostic external-service seams
 │   │   └── llm.py                # LLMRepository: chat (default/powerful tiers) + generate_image
 │   └── tools/                    # LangChain @tool functions (the agent's skills)
@@ -57,8 +61,10 @@ PaperAgent/
 │   │   ├── App.jsx               # Root: auth gate, routing between login/chat/guidelines
 │   │   ├── api.js                # Backend API wrapper
 │   │   ├── auth.js               # JWT in localStorage; dispatches auth:logout on 401
+│   │   ├── util/doi.js           # extractDois(): detect DOIs in assistant messages
 │   │   └── components/           # ChatWindow, FileSidebar, InterruptCard, LoginPage,
-│   │                             #   MentionDropdown, Message, MessageInput, SessionBar/List, GuidelinesPage
+│   │                             #   MentionDropdown, Message, MessageInput, SessionBar/List, GuidelinesPage,
+│   │                             #   DownloadModal, DownloadStatus (provider PDF download UI)
 │   ├── vite.config.js            # Dev server proxies /api -> :8000
 │   ├── nginx.conf                # Prod: serves bundle, proxies /api -> app:8000
 │   └── Dockerfile
@@ -83,3 +89,4 @@ PaperAgent/
 - **New API route:** add router in `app/api/v1/endpoints/`, include it in `app/main.py`, depend on `get_current_user` + `get_db`, verify session ownership for session-scoped routes.
 - **New DB model:** add to `app/models/`, ensure it's imported so `Base.metadata.create_all` (in `init_models`) picks it up.
 - **New env var:** add to `Settings` in `app/core/config.py` and to `.env.example`.
+- **PDF download queue:** scheduling/quota/fairness/retry rules are pure functions in `app/services/download_service.py` (unit-tested in `tests/test_downloads.py`); the background loop is `app/core/download_worker.py`. Keep the provider token backend-only.

@@ -44,6 +44,22 @@ over re-scanning the codebase. For depth see `Design.md`, `PRD.md`,
      open**, blocks off-topic/jailbreak with `status="blocked"` (not billed).
      Toggle `ENABLE_GUARDRAILS`. Both agent prompts also have a "Scope & safety"
      section.
+7c. **Provider PDF download queue** (added on `prod`):
+   - Frontend detects DOIs in assistant messages → `📄 Get PDF` chip → modal →
+     `POST /downloads`. **No agent/tool change** — it's pure frontend + REST.
+   - DB-backed `download_jobs` table (`app/models/downloads.py`), one **background
+     worker** (`app/core/download_worker.py`) started in the lifespan, **one job
+     at a time**. Guarded by `ENABLE_DOWNLOAD_WORKER` (off in tests).
+   - `PROVIDER_TOKEN` is **backend-only** — used solely in the worker's provider
+     call, never sent to the frontend. Endpoint: `{PROVIDER_BASE_URL}/article/doi`.
+   - Quota 10 / rolling 24h; **retries + duplicate active DOIs don't consume
+     quota**. 404 → retry via a future `available_at` (10, 20 min) — the worker
+     **never sleeps**; 3rd 404 → `FAILED/PDF_NOT_FOUND`.
+   - FAST (requests 1–3, ~1h) vs STANDARD (4–10, spread over 24h + per-user
+     jitter). Quota/scheduling/fairness/retry are **pure functions** in
+     `app/services/download_service.py` (tested in `tests/test_downloads.py`).
+   - On success the PDF goes through the **same ingestion path** as `/upload`
+     (`ingest_pdf` + `session_manager.add_files`) → becomes conversation context.
 8. **LLM/image calls have a central seam** — `app/repositories/llm.py`
    (`llm_repo`): tiers `default` (`OPENAI_MODEL`) vs `powerful` (`POWERFUL_MODEL`,
    e.g. gpt-5.5) + `generate_image` (`IMAGE_MODEL`). New code should call it;

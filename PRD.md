@@ -53,8 +53,17 @@ writing papers, working locally (Docker) with their own OpenAI key.
 | F15 | Discover new literature on arXiv | `search_literature` | — |
 | F16 | Resolve DOI/title → metadata + BibTeX (Crossref) | `resolve_citation` | — |
 | F17 | Compile approved sections into a .docx | `compile_paper` | ✅ |
+| F18 | Fetch a paper's full-text PDF by DOI from the provider, ingest it, and attach it to the conversation | `/downloads` queue + background worker | user-confirmed via modal |
 
 ## 7. Key User Flows
+4. **Download a paper by DOI:** the agent mentions a DOI → user clicks `📄 Get
+   PDF` → confirms in a modal → a job is queued and processed one-at-a-time
+   (quota 10 / 24h; requests 1–3 prioritised, 4–10 spread over 24h). While it
+   runs the user keeps chatting. On success the PDF is ingested and becomes
+   context for future messages. On a `404`, the job retries up to 3× (after 10
+   then 20 min) without blocking other downloads; if it still fails, the user is
+   offered **Upload PDF** (from a trusted source, same ingestion pipeline) or
+   **Continue without PDF** (answers use only currently-available information).
 1. **Screen abstracts:** upload CSV → ask to screen against criteria → agent
    pauses for approval → approve → color-coded `.xlsx` produced.
 2. **Draft a paper:** ingest PDFs → generate outline → draft each section

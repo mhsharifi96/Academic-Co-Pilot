@@ -2,9 +2,19 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1.endpoints import chat, ingestion, sessions, files, auth, admin
+from app.api.v1.endpoints import (
+    chat,
+    ingestion,
+    sessions,
+    files,
+    auth,
+    admin,
+    downloads,
+)
 from app.core.checkpointer import build_checkpointer_cm
+from app.core.config import settings
 from app.core.database import init_models, bootstrap_admin
+from app.core.download_worker import download_worker
 from app.agents.academic_agent import AcademicAgent
 from app.agents.deep_agent import DeepResearchAgent
 
@@ -34,7 +44,16 @@ async def lifespan(app: FastAPI):
         # no human-in-the-loop).
         app.state.agent = AcademicAgent(checkpointer=saver)
         app.state.deep_agent = DeepResearchAgent(checkpointer=saver)
-        yield
+
+        # Single background worker for the PDF download queue (one job at a time).
+        # Disabled in the offline test suite via ENABLE_DOWNLOAD_WORKER=false.
+        if settings.ENABLE_DOWNLOAD_WORKER:
+            download_worker.start()
+        try:
+            yield
+        finally:
+            if settings.ENABLE_DOWNLOAD_WORKER:
+                await download_worker.stop()
     # Saver / connection pool closed here by the context manager.
 
 
@@ -60,6 +79,7 @@ app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(ingestion.router, prefix="/api/v1", tags=["ingestion"])
 app.include_router(sessions.router, prefix="/api/v1", tags=["sessions"])
 app.include_router(files.router, prefix="/api/v1", tags=["files"])
+app.include_router(downloads.router, prefix="/api/v1", tags=["downloads"])
 
 @app.get("/")
 async def root():

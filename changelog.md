@@ -7,6 +7,26 @@ All notable changes to this project. Format loosely follows
 Work in progress on the current branch (`main`) — not yet committed. Adds the
 authentication and persistence layer on top of the original agent MVP:
 ### Added
+- **Provider PDF download queue (DOI → PDF → ingest → attach).** Users can now
+  pull a paper's full text from the external provider. The frontend detects DOIs
+  in assistant messages and shows a `📄 Get PDF` chip → a confirmation modal
+  (`DownloadModal.jsx`) that queues a job (`POST /downloads`). A single DB-backed
+  queue (`download_jobs` table, `app/models/downloads.py`) is drained by one
+  background worker (`app/core/download_worker.py`, started in the lifespan,
+  guarded by `ENABLE_DOWNLOAD_WORKER`) that runs jobs one-at-a-time. On success
+  the PDF is ingested (`ingest_pdf`) and registered on the session, so it becomes
+  context for future messages; on `404` it retries up to 3× by rescheduling a
+  future `available_at` (10 then 20 min) — the worker never sleeps, so other jobs
+  keep flowing. Business logic (quota, scheduling, fairness, retry) lives in pure,
+  unit-tested functions in `app/services/download_service.py`
+  (`tests/test_downloads.py`). Per-user quota (10 / rolling 24h; retries and
+  duplicate active DOIs don't consume quota), a FAST (requests 1–3, ~1h target)
+  vs STANDARD (4–10, spread over 24h with per-user jitter) priority split, and a
+  fair scheduler that rotates users within a priority round, applies FAST→STANDARD
+  anti-starvation, and lets near-deadline FAST jobs jump the queue. On terminal
+  failure the chat offers "Upload PDF" (reusing the existing upload/ingest path)
+  or "Continue without PDF" (`DownloadStatus.jsx`). The provider token is
+  backend-only (`PROVIDER_TOKEN`) and never sent to the browser.
 - **Per-user balance + usage billing.** Each account now has a `balance` (USD,
   default `$0.50`, configurable via `DEFAULT_USER_BALANCE`). Every chat/resume
   turn measures its token usage (`BaseAgent.run`/`resume` now wrap the graph

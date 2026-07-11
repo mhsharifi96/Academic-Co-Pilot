@@ -6,6 +6,7 @@ import SessionList from "./components/SessionList.jsx";
 import FileSidebar from "./components/FileSidebar.jsx";
 import PlanSidebar from "./components/PlanSidebar.jsx";
 import ChatWindow from "./components/ChatWindow.jsx";
+import DownloadModal from "./components/DownloadModal.jsx";
 import MessageInput from "./components/MessageInput.jsx";
 import GuidelinesPage from "./components/GuidelinesPage.jsx";
 import AdminPage from "./components/AdminPage.jsx";
@@ -24,6 +25,8 @@ export default function App() {
   const [draft, setDraft] = useState("");
   const [view, setView] = useState("chat"); // "chat" | "guidelines" | "admin"
   const [agentType, setAgentType] = useState("academic"); // "academic" | "deep"
+  const [downloadModalDoi, setDownloadModalDoi] = useState(null); // DOI awaiting confirm
+  const [downloadReload, setDownloadReload] = useState(0); // bump to refresh job list
 
   // Drop back to the login screen if any request reports the token expired.
   useEffect(() => {
@@ -190,6 +193,42 @@ export default function App() {
     [sessionId, refreshSessions]
   );
 
+  // ----- PDF downloads -----
+  const refreshFiles = useCallback(
+    async (sid) => {
+      const id = sid || sessionId;
+      if (!id) return;
+      try {
+        const listed = await api.listFiles(id);
+        setFiles(listed.files || []);
+      } catch {
+        /* non-fatal */
+      }
+    },
+    [sessionId]
+  );
+
+  const handleRequestPdf = useCallback((doi) => setDownloadModalDoi(doi), []);
+  const handleDownloadCreated = useCallback(
+    () => setDownloadReload((n) => n + 1),
+    []
+  );
+  const handleDownloadIngested = useCallback(() => {
+    refreshFiles();
+  }, [refreshFiles]);
+  const handleContinueWithout = useCallback((job) => {
+    setMessages((m) => [
+      ...m,
+      {
+        role: "assistant",
+        content:
+          `Okay — continuing without the full PDF for ${job.doi}. My answers ` +
+          `will be based only on the information currently available in this ` +
+          `conversation.`,
+      },
+    ]);
+  }, []);
+
   const startNewSession = useCallback(() => {
     setSessionId(null);
     setMessages([]);
@@ -199,6 +238,7 @@ export default function App() {
     setError(null);
     setDraft("");
     setAgentType("academic");
+    setDownloadModalDoi(null);
     setView("chat");
   }, []);
 
@@ -313,7 +353,21 @@ export default function App() {
               agentType={agentType}
               onAgentTypeChange={setAgentType}
               agentLocked={messages.length > 0 || !!sessionId}
+              sessionId={sessionId}
+              onRequestPdf={handleRequestPdf}
+              downloadReload={downloadReload}
+              onDownloadIngested={handleDownloadIngested}
+              onUploadPdf={handleUpload}
+              onContinueWithout={handleContinueWithout}
             />
+            {downloadModalDoi && (
+              <DownloadModal
+                doi={downloadModalDoi}
+                sessionId={sessionId}
+                onClose={() => setDownloadModalDoi(null)}
+                onCreated={handleDownloadCreated}
+              />
+            )}
             <MessageInput
               value={draft}
               onChange={setDraft}

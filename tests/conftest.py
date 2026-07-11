@@ -13,3 +13,5 @@ os.environ.setdefault("OPENAI_API_KEY", "sk-test-dummy")
 os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost:5432/test")
 os.environ.setdefault("LANGCHAIN_TRACING_V2", "false")
 os.environ.setdefault("LANGCHAIN_API_KEY", "")
+# Don't spin up the background PDF-download worker during the offline test suite.
+os.environ.setdefault("ENABLE_DOWNLOAD_WORKER", "false")

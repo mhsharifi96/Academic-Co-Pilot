@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import Message from "./Message.jsx";
 import InterruptCard from "./InterruptCard.jsx";
 import AgentSelector from "./AgentSelector.jsx";
+import DownloadStatus from "./DownloadStatus.jsx";
 
 export default function ChatWindow({
   messages,
@@ -11,6 +12,12 @@ export default function ChatWindow({
   agentType,
   onAgentTypeChange,
   agentLocked,
+  sessionId,
+  onRequestPdf,
+  downloadReload,
+  onDownloadIngested,
+  onUploadPdf,
+  onContinueWithout,
 }) {
   const endRef = useRef(null);
 
@@ -44,8 +51,21 @@ export default function ChatWindow({
       )}
 
       {messages.map((m, i) => (
-        <Message key={i} role={m.role} content={m.content} />
+        <Message
+          key={i}
+          role={m.role}
+          content={m.content}
+          onRequestPdf={onRequestPdf}
+        />
       ))}
+
+      <DownloadStatus
+        sessionId={sessionId}
+        reloadToken={downloadReload}
+        onIngested={onDownloadIngested}
+        onUploadPdf={onUploadPdf}
+        onContinueWithout={onContinueWithout}
+      />
 
       {interrupt && (
         <InterruptCard

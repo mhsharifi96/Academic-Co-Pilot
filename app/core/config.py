@@ -83,6 +83,41 @@ class Settings(BaseSettings):
     # unset — keep it cheap, this runs on every message.
     GUARDRAIL_MODEL: Optional[str] = None
 
+    # ---- Provider PDF download queue ---------------------------------------
+    # External provider that serves full-text PDFs by DOI. The token is a
+    # BACKEND SECRET — it is only ever used server-side in the download worker
+    # and must never be sent to the frontend. Leave PROVIDER_TOKEN unset to run
+    # without downloads (jobs will fail with a provider error).
+    PROVIDER_BASE_URL: str = "http://provide.falinoos.ir:8081"
+    PROVIDER_TOKEN: Optional[str] = None
+    PROVIDER_TIMEOUT: float = 60.0
+    # Per-user quota: at most DOWNLOAD_QUOTA_LIMIT originating requests per
+    # rolling DOWNLOAD_QUOTA_WINDOW_HOURS. Retries reuse the same job row and do
+    # NOT consume additional quota.
+    DOWNLOAD_QUOTA_LIMIT: int = 10
+    DOWNLOAD_QUOTA_WINDOW_HOURS: int = 24
+    # Retry policy: at most DOWNLOAD_MAX_ATTEMPTS attempts; on a 404 the job is
+    # rescheduled with a future available_at (worker never sleeps for the delay).
+    # DOWNLOAD_RETRY_DELAYS_MIN lists the minutes before attempt 2, attempt 3, …
+    DOWNLOAD_MAX_ATTEMPTS: int = 3
+    DOWNLOAD_RETRY_DELAYS_MIN: str = "10,20"
+    # First three requests are FAST (target ~1h); requests 4..10 are STANDARD,
+    # spread across the next 24h at these hour offsets (index = request_number-4).
+    FAST_TARGET_MINUTES: int = 60
+    STANDARD_TARGET_HOURS: int = 24
+    STANDARD_OFFSETS_HOURS: str = "1,5,9,12,16,20,24"
+    # Deterministic per-user jitter (± minutes) so different users' scheduled
+    # jobs don't all become available at exactly the same instant.
+    SCHEDULE_JITTER_MINUTES: int = 15
+    # Anti-starvation: after this many FAST jobs, serve one eligible STANDARD job.
+    FAST_BEFORE_STANDARD: int = 5
+    # A FAST job whose target_deadline is within this many minutes jumps the queue.
+    DEADLINE_URGENT_MINUTES: int = 10
+    # Background worker poll interval when the queue has no eligible job.
+    WORKER_POLL_SECONDS: float = 5.0
+    # Start the background download worker on app startup. Disabled in tests.
+    ENABLE_DOWNLOAD_WORKER: bool = True
+
     # LangSmith Configuration
     LANGCHAIN_TRACING_V2: bool = True
     LANGCHAIN_ENDPOINT: Optional[str] = None

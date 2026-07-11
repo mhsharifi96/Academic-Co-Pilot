@@ -1,5 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import { getToken } from "../auth.js";
+import { extractDois } from "../util/doi.js";
 
 // Artifact paths the agent writes to and that the backend will serve.
 const IMG_RE = /\.(png|jpe?g|gif|svg|webp)$/i;
@@ -37,8 +38,10 @@ function linkifyArtifacts(text) {
   });
 }
 
-export default function Message({ role, content }) {
+export default function Message({ role, content, onRequestPdf }) {
   const isUser = role === "user";
+  // DOIs the agent mentioned — offer a one-click "Get PDF" for each.
+  const dois = isUser || !onRequestPdf ? [] : extractDois(content);
 
   if (isUser) {
     return (
@@ -101,6 +104,21 @@ export default function Message({ role, content }) {
           {linkifyArtifacts(content)}
         </ReactMarkdown>
       </div>
+
+      {dois.length > 0 && (
+        <div className="doi-actions">
+          {dois.map((doi) => (
+            <button
+              key={doi}
+              className="doi-chip"
+              title={`Request the full-text PDF for ${doi}`}
+              onClick={() => onRequestPdf(doi)}
+            >
+              📄 Get PDF <span className="doi-code">{doi}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

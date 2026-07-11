@@ -112,6 +112,34 @@ sync with the registered tools.
 72 bytes deliberately. Every session-scoped request verifies the user **owns**
 the session (cross-user access → 404).
 
+### 10. Provider PDF download queue (fair, single-worker)
+Users pull full-text PDFs by DOI from an external provider. The token is a
+**backend secret** used only in the worker's request — it never reaches the
+browser. Design points:
+- **DB-backed queue, one worker.** `download_jobs` is an app table;
+  `app/core/download_worker.py` is a single asyncio loop started in the lifespan
+  (guarded by `ENABLE_DOWNLOAD_WORKER`). One job runs at a time. DB persistence is
+  required so delayed retries survive a restart; the single worker matches the
+  existing in-process/single-worker assumption.
+- **Trigger is frontend-only.** The SPA detects DOIs in assistant messages and
+  offers a confirmation modal — no change to the agent graph or tool set.
+- **Retries never block the worker.** A `404` reschedules the job with a future
+  `available_at` (10 then 20 min); the worker only ever picks jobs whose
+  `available_at` has passed, so it keeps draining other jobs during the delay.
+  Third `404` → `FAILED/PDF_NOT_FOUND`.
+- **Quota + priority + fairness.** 10 requests / rolling 24h (retries and
+  duplicate active DOIs don't count). Requests 1–3 are FAST (~1h target); 4–10
+  are STANDARD, spread across 24h with deterministic per-user jitter. The
+  scheduler (`pick_next`) approximates the spec: near-deadline FAST jobs jump the
+  queue, users are rotated within a priority round (`served_count`) so none
+  monopolises, and a FAST→STANDARD ratio (`FAST_BEFORE_STANDARD`) prevents
+  STANDARD starvation. The rules are **pure functions** in
+  `app/services/download_service.py`, unit-tested offline.
+- **Success reuses the ingestion path.** The PDF is saved under
+  `data/<session_id>/`, ingested via `ingest_pdf`, and registered with
+  `SessionManager` — exactly what `/upload` does — so it becomes conversation
+  context.
+
 ## Extensibility
 Adding a tool is low-friction: write a `@tool`, append to the `AcademicAgent`
 tool list, document in `skills.md`, and (if it executes code / mutates state)
@@ -122,3 +150,7 @@ add it to `INTERRUPT_TOOLS`. No router or graph changes needed.
 - OpenAI-only; model set via `OPENAI_MODEL`.
 - `analytics_sandbox` uses `PythonREPL` (not a hardened sandbox) — HITL approval
   is the safety boundary.
+- The PDF download worker is a **single in-process** loop (matches the
+  single-worker assumption); it is not yet a distributed queue. The fair
+  scheduler is an intentional **approximation** of the priority/fairness spec
+  (see decision 10), not a strict global ordering.
