@@ -2,10 +2,10 @@
 // Mirrors the backend DOI shape (app/tools/literature.py:_DOI_RE); the backend
 // re-validates and normalises whatever we submit, so this only needs to be a
 // good-enough detector.
-const DOI_RE = /\b10\.\d{4,9}\/[^\s"'<>()\[\]]+/gi;
+const DOI_RE = /\b10\.\d{4,9}\/[^\s"'<>()\[\]*]+/gi;
 
-// Trailing sentence punctuation that shouldn't be part of the DOI.
-const TRAILING = /[.,;:)\]]+$/;
+// Trailing sentence / markdown punctuation that shouldn't be part of the DOI.
+const TRAILING = /[.,;:)\]\*]+$/;
 
 export function extractDois(text) {
   if (!text) return [];

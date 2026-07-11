@@ -28,6 +28,7 @@ from app.tools.literature import (
     search_scopus,
     search_openalex,
 )
+from app.tools.open_access_pdf import find_and_ingest_open_access_pdf
 from app.tools.exporter import compile_paper
 from app.tools.reference_checker import validate_references
 from app.tools.humanizer import humanize_text
@@ -53,6 +54,7 @@ _CORE_TOOLS: List[BaseTool] = [
     resolve_citation,
     search_scopus,
     search_openalex,
+    find_and_ingest_open_access_pdf,
     compile_paper,
     validate_references,
     humanize_text,

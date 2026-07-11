@@ -7,6 +7,7 @@ import FileSidebar from "./components/FileSidebar.jsx";
 import PlanSidebar from "./components/PlanSidebar.jsx";
 import ChatWindow from "./components/ChatWindow.jsx";
 import DownloadModal from "./components/DownloadModal.jsx";
+import DownloadsPage from "./components/DownloadsPage.jsx";
 import MessageInput from "./components/MessageInput.jsx";
 import GuidelinesPage from "./components/GuidelinesPage.jsx";
 import AdminPage from "./components/AdminPage.jsx";
@@ -23,7 +24,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [draft, setDraft] = useState("");
-  const [view, setView] = useState("chat"); // "chat" | "guidelines" | "admin"
+  const [view, setView] = useState("chat"); // "chat" | "guidelines" | "downloads" | "admin"
   const [agentType, setAgentType] = useState("academic"); // "academic" | "deep"
   const [downloadModalDoi, setDownloadModalDoi] = useState(null); // DOI awaiting confirm
   const [downloadReload, setDownloadReload] = useState(0); // bump to refresh job list
@@ -345,37 +346,50 @@ export default function App() {
 
           <main className="main">
             {error && <div className="banner-error">⚠️ {error}</div>}
-            <ChatWindow
-              messages={messages}
-              interrupt={interrupt}
-              loading={loading}
-              onResume={handleResume}
-              agentType={agentType}
-              onAgentTypeChange={setAgentType}
-              agentLocked={messages.length > 0 || !!sessionId}
-              sessionId={sessionId}
-              onRequestPdf={handleRequestPdf}
-              downloadReload={downloadReload}
-              onDownloadIngested={handleDownloadIngested}
-              onUploadPdf={handleUpload}
-              onContinueWithout={handleContinueWithout}
-            />
-            {downloadModalDoi && (
-              <DownloadModal
-                doi={downloadModalDoi}
+            {view === "downloads" ? (
+              <DownloadsPage
                 sessionId={sessionId}
-                onClose={() => setDownloadModalDoi(null)}
+                reloadToken={downloadReload}
                 onCreated={handleDownloadCreated}
+                onIngested={handleDownloadIngested}
+                onUploadPdf={handleUpload}
+                onContinueWithout={handleContinueWithout}
               />
+            ) : (
+              <>
+                <ChatWindow
+                  messages={messages}
+                  interrupt={interrupt}
+                  loading={loading}
+                  onResume={handleResume}
+                  agentType={agentType}
+                  onAgentTypeChange={setAgentType}
+                  agentLocked={messages.length > 0 || !!sessionId}
+                  sessionId={sessionId}
+                  onRequestPdf={handleRequestPdf}
+                  downloadReload={downloadReload}
+                  onDownloadIngested={handleDownloadIngested}
+                  onUploadPdf={handleUpload}
+                  onContinueWithout={handleContinueWithout}
+                />
+                {downloadModalDoi && (
+                  <DownloadModal
+                    doi={downloadModalDoi}
+                    sessionId={sessionId}
+                    onClose={() => setDownloadModalDoi(null)}
+                    onCreated={handleDownloadCreated}
+                  />
+                )}
+                <MessageInput
+                  value={draft}
+                  onChange={setDraft}
+                  onSend={handleSend}
+                  files={files}
+                  disabled={loading || !!interrupt}
+                  interrupted={!!interrupt}
+                />
+              </>
             )}
-            <MessageInput
-              value={draft}
-              onChange={setDraft}
-              onSend={handleSend}
-              files={files}
-              disabled={loading || !!interrupt}
-              interrupted={!!interrupt}
-            />
           </main>
         </>
       )}

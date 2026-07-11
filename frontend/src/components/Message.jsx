@@ -40,8 +40,24 @@ function linkifyArtifacts(text) {
 
 export default function Message({ role, content, onRequestPdf }) {
   const isUser = role === "user";
-  // DOIs the agent mentioned — offer a one-click "Get PDF" for each.
-  const dois = isUser || !onRequestPdf ? [] : extractDois(content);
+  // Offer a one-click "Get PDF" for DOIs mentioned in either side of the chat.
+  // This lets users paste a DOI directly even if the assistant cannot discuss it.
+  const dois = onRequestPdf ? extractDois(content) : [];
+  const doiActions =
+    dois.length > 0 ? (
+      <div className="doi-actions">
+        {dois.map((doi) => (
+          <button
+            key={doi}
+            className="doi-chip"
+            title={`Request the full-text PDF for ${doi}`}
+            onClick={() => onRequestPdf(doi)}
+          >
+            📄 Get PDF <span className="doi-code">{doi}</span>
+          </button>
+        ))}
+      </div>
+    ) : null;
 
   if (isUser) {
     return (
@@ -50,6 +66,7 @@ export default function Message({ role, content, onRequestPdf }) {
         <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
           {content}
         </div>
+        {doiActions}
       </div>
     );
   }
@@ -105,20 +122,7 @@ export default function Message({ role, content, onRequestPdf }) {
         </ReactMarkdown>
       </div>
 
-      {dois.length > 0 && (
-        <div className="doi-actions">
-          {dois.map((doi) => (
-            <button
-              key={doi}
-              className="doi-chip"
-              title={`Request the full-text PDF for ${doi}`}
-              onClick={() => onRequestPdf(doi)}
-            >
-              📄 Get PDF <span className="doi-code">{doi}</span>
-            </button>
-          ))}
-        </div>
-      )}
+      {doiActions}
     </div>
   );
 }

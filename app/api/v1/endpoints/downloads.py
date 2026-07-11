@@ -73,16 +73,22 @@ async def get_download(
 
 @router.get("/downloads", response_model=DownloadListResponse)
 async def list_downloads(
-    session_id: str = Query(..., description="Conversation to list jobs for"),
+    session_id: str | None = Query(
+        None,
+        description="Optional conversation to list jobs for. Omit to list all jobs.",
+    ),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all download jobs for a session (drives the in-chat status + failure UX)."""
-    owned = await get_owned_session(db, current_user, session_id)
-    if owned is None:
-        raise HTTPException(status_code=404, detail="Session not found.")
+    """List download jobs for one session, or all jobs owned by the user."""
+    if session_id:
+        owned = await get_owned_session(db, current_user, session_id)
+        if owned is None:
+            raise HTTPException(status_code=404, detail="Session not found.")
+        jobs = await svc.list_jobs_for_session(db, current_user, session_id)
+    else:
+        jobs = await svc.list_jobs_for_user(db, current_user)
 
-    jobs = await svc.list_jobs_for_session(db, current_user, session_id)
     remaining = await svc.quota_remaining(
         db, current_user.id, datetime.now(timezone.utc)
     )

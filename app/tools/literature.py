@@ -1,8 +1,8 @@
 """
 External literature tools (read-only, network-backed).
 
-  - ``search_literature`` searches arXiv (free, no API key) for papers matching
-    a query.
+  - ``search_literature`` searches across Scopus/Elsevier (when configured),
+    arXiv, and finally Crossref for papers matching a query.
   - ``resolve_citation`` resolves a DOI or title to clean citation metadata +
     a BibTeX entry via Crossref (free, no API key), so the agent can ground
     citations in real metadata instead of guessing.
@@ -20,7 +20,7 @@ as strings — tools must never raise into the LangGraph run.
 
 import re
 import xml.etree.ElementTree as ET
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import httpx
 from langchain_core.tools import tool
@@ -73,17 +73,51 @@ def _parse_arxiv_atom(xml: str) -> List[Dict[str, str]]:
 @tool
 def search_literature(query: str, max_results: int = 8) -> str:
     """
-    Search arXiv for academic papers matching a query (free, no key required).
+    Search multiple academic indexes for papers matching a query.
 
-    Use this to discover relevant literature that has NOT been uploaded yet.
-    Returns title, authors, year, arXiv id/link, and an abstract snippet for
-    each hit. To then read or cite a paper, ingest its PDF or call
-    `resolve_citation`.
+    Discovery order is intentional:
+    1. Scopus / Elsevier first for journal-published and indexed papers when
+       ELSEVIER_API_KEY is configured.
+    2. arXiv next for recent preprints.
+    3. Crossref last as a DOI/metadata fallback.
+
+    Use this for user requests like "find papers about..." or "find a paper
+    with this title/topic", especially when recent 2025/2026 work may not appear
+    in Crossref as the top result. To then read or cite a paper, ingest its PDF
+    or call `resolve_citation`.
 
     Args:
         query: Search terms (e.g. 'agentic RAG for legal compliance').
         max_results: Maximum number of papers to return (default 8).
     """
+    limit = max(1, min(max_results, 25))
+    sections: List[str] = [f"Literature search for {query!r}:"]
+
+    scopus_status, scopus_papers = _search_scopus(query, limit)
+    if scopus_papers:
+        sections.append(_format_scopus_results(query, scopus_papers, "Scopus / Elsevier"))
+    else:
+        sections.append(f"Scopus / Elsevier: {scopus_status}")
+
+    arxiv_status, arxiv_papers = _search_arxiv(query, limit)
+    if arxiv_papers:
+        sections.append(_format_arxiv_results(query, arxiv_papers))
+    else:
+        sections.append(f"arXiv: {arxiv_status}")
+
+    crossref_status, crossref_papers = _search_crossref(query, limit)
+    if crossref_papers:
+        sections.append(_format_crossref_results(query, crossref_papers))
+    else:
+        sections.append(f"Crossref: {crossref_status}")
+
+    found_any = bool(scopus_papers or arxiv_papers or crossref_papers)
+    if not found_any:
+        sections.append("No papers found. Try broader terms or an exact DOI/title.")
+    return "\n\n".join(sections)
+
+
+def _search_arxiv(query: str, max_results: int) -> Tuple[str, List[Dict[str, str]]]:
     params = {
         "search_query": f"all:{query}",
         "start": 0,
@@ -98,12 +132,14 @@ def search_literature(query: str, max_results: int = 8) -> str:
         resp.raise_for_status()
         papers = _parse_arxiv_atom(resp.text)
     except Exception as e:
-        return f"Error searching arXiv: {str(e)}"
-
+        return f"error searching arXiv: {str(e)}", []
     if not papers:
-        return f"No arXiv papers found for {query!r}. Try broader or different terms."
+        return "no arXiv papers found", []
+    return f"found {len(papers)} papers", papers
 
-    blocks = [f"Found {len(papers)} arXiv papers for {query!r}:\n"]
+
+def _format_arxiv_results(query: str, papers: List[Dict[str, str]]) -> str:
+    blocks = [f"arXiv results ({len(papers)}) for {query!r}:\n"]
     for i, p in enumerate(papers, 1):
         snippet = p["summary"][:300] + ("…" if len(p["summary"]) > 300 else "")
         blocks.append(
@@ -125,23 +161,32 @@ def _bibtex_key(authors: List[str], year: str) -> str:
     return f"{first}{year or 'n.d.'}"
 
 
+def _crossref_authors(work: Dict) -> List[str]:
+    return [
+        " ".join(p for p in (a.get("given"), a.get("family")) if p)
+        for a in work.get("author", [])
+    ]
+
+
+def _crossref_year(work: Dict) -> str:
+    date_parts = (
+        work.get("published-online", {}).get("date-parts")
+        or work.get("published-print", {}).get("date-parts")
+        or work.get("issued", {}).get("date-parts")
+        or work.get("published", {}).get("date-parts")
+        or [[""]]
+    )
+    return str(date_parts[0][0]) if date_parts and date_parts[0] else ""
+
+
 def _format_crossref_work(work: Dict) -> str:
     """
     Format a Crossref ``message`` work object into clean metadata + a BibTeX
     entry. Pure (no network) so it can be tested offline.
     """
     title = (work.get("title") or ["(untitled)"])[0]
-    authors = [
-        " ".join(p for p in (a.get("given"), a.get("family")) if p)
-        for a in work.get("author", [])
-    ]
-    # year lives under issued/published date-parts
-    date_parts = (
-        work.get("issued", {}).get("date-parts")
-        or work.get("published", {}).get("date-parts")
-        or [[""]]
-    )
-    year = str(date_parts[0][0]) if date_parts and date_parts[0] else ""
+    authors = _crossref_authors(work)
+    year = _crossref_year(work)
     venue = (work.get("container-title") or [""])[0]
     doi = work.get("DOI", "")
     entry_type = "article" if work.get("type") == "journal-article" else "misc"
@@ -169,6 +214,60 @@ def _format_crossref_work(work: Dict) -> str:
         "\n".join(bibtex_lines),
     ]
     return "\n".join(meta)
+
+
+def _parse_crossref_results(data: Dict) -> List[Dict[str, str]]:
+    items = data.get("message", {}).get("items", []) or []
+    papers: List[Dict[str, str]] = []
+    for work in items:
+        title = (work.get("title") or ["(untitled)"])[0]
+        authors = _crossref_authors(work)
+        doi = work.get("DOI", "") or ""
+        papers.append({
+            "title": title,
+            "authors": ", ".join(a for a in authors if a),
+            "year": _crossref_year(work),
+            "venue": (work.get("container-title") or [""])[0],
+            "doi": doi,
+            "type": work.get("type", ""),
+            "link": f"https://doi.org/{doi}" if doi else work.get("URL", ""),
+        })
+    return papers
+
+
+def _search_crossref(query: str, max_results: int) -> Tuple[str, List[Dict[str, str]]]:
+    params = {
+        "query.bibliographic": query,
+        "rows": max(1, min(max_results, 25)),
+        "mailto": _POLITE_MAILTO,
+    }
+    try:
+        resp = httpx.get(
+            _CROSSREF_API,
+            params=params,
+            timeout=20.0,
+            headers={"User-Agent": _USER_AGENT},
+        )
+        resp.raise_for_status()
+        papers = _parse_crossref_results(resp.json())
+    except Exception as e:
+        return f"error searching Crossref: {str(e)}", []
+    if not papers:
+        return "no Crossref metadata found", []
+    return f"found {len(papers)} metadata records", papers
+
+
+def _format_crossref_results(query: str, papers: List[Dict[str, str]]) -> str:
+    blocks = [f"Crossref metadata fallback ({len(papers)}) for {query!r}:\n"]
+    for i, p in enumerate(papers, 1):
+        doi = f"  DOI: {p['doi']}" if p["doi"] else ""
+        blocks.append(
+            f"{i}. {p['title']} ({p['year'] or 'n.d.'})\n"
+            f"   Authors: {p['authors'] or '(n/a)'}\n"
+            f"   Venue: {p['venue'] or '(n/a)'}  Type: {p['type'] or '(n/a)'}{doi}\n"
+            f"   {p['link'] or '(no link)'}"
+        )
+    return "\n\n".join(blocks)
 
 
 @tool
@@ -250,27 +349,12 @@ def _parse_scopus_results(data: Dict) -> List[Dict[str, str]]:
     return papers
 
 
-@tool
-def search_scopus(query: str, max_results: int = 10) -> str:
-    """
-    Search Elsevier's Scopus for peer-reviewed / indexed academic literature
-    (requires an Elsevier API key configured on the server).
-
-    Complements `search_literature` (arXiv preprints): Scopus covers published,
-    indexed work across publishers and includes citation counts. Use it to find
-    well-cited or journal-published papers. The query supports Scopus syntax;
-    plain keywords are matched against title, abstract, and keywords.
-
-    Args:
-        query: Search terms (e.g. 'agentic RAG legal compliance') or a Scopus
-            boolean query.
-        max_results: Maximum number of results to return (default 10, capped at 25).
-    """
+def _search_scopus(query: str, max_results: int) -> Tuple[str, List[Dict[str, str]]]:
     api_key = settings.ELSEVIER_API_KEY
     if not api_key:
         return (
-            "Scopus search is not configured. Set ELSEVIER_API_KEY in the server "
-            "environment (get a key at https://dev.elsevier.com/) to enable it."
+            "not configured; set ELSEVIER_API_KEY to enable Scopus discovery",
+            [],
         )
 
     # Wrap bare keyword queries in TITLE-ABS-KEY for relevance; pass through
@@ -296,18 +380,24 @@ def search_scopus(query: str, max_results: int = 10) -> str:
         code = e.response.status_code
         if code in (401, 403):
             return (
-                "Scopus rejected the request (auth/entitlement). Check "
+                "rejected the request (auth/entitlement). Check "
                 "ELSEVIER_API_KEY; full results may require your institution's "
-                "network or an institutional token."
+                "network or an institutional token.",
+                [],
             )
-        return f"Error searching Scopus (HTTP {code})."
+        return f"error searching Scopus (HTTP {code})", []
     except Exception as e:
-        return f"Error searching Scopus: {str(e)}"
+        return f"error searching Scopus: {str(e)}", []
 
     if not papers:
-        return f"No Scopus results found for {query!r}. Try broader or different terms."
+        return "no Scopus results found", []
+    return f"found {len(papers)} results", papers
 
-    blocks = [f"Found {len(papers)} Scopus results for {query!r}:\n"]
+
+def _format_scopus_results(
+    query: str, papers: List[Dict[str, str]], heading: str = "Scopus"
+) -> str:
+    blocks = [f"{heading} results ({len(papers)}) for {query!r}:\n"]
     for i, p in enumerate(papers, 1):
         cited = f"  (cited by {p['cited_by']})" if p["cited_by"] else ""
         doi = f"  DOI: {p['doi']}" if p["doi"] else ""
@@ -317,6 +407,28 @@ def search_scopus(query: str, max_results: int = 10) -> str:
             f"   {p['link']}{doi}"
         )
     return "\n\n".join(blocks)
+
+
+@tool
+def search_scopus(query: str, max_results: int = 10) -> str:
+    """
+    Search Elsevier's Scopus for peer-reviewed / indexed academic literature
+    (requires an Elsevier API key configured on the server).
+
+    Complements `search_literature`: Scopus covers published, indexed work
+    across publishers and includes citation counts. Use it directly when the
+    user specifically asks for Scopus/Elsevier results. Plain keywords are
+    matched against title, abstract, and keywords.
+
+    Args:
+        query: Search terms (e.g. 'agentic RAG legal compliance') or a Scopus
+            boolean query.
+        max_results: Maximum number of results to return (default 10, capped at 25).
+    """
+    status, papers = _search_scopus(query, max_results)
+    if not papers:
+        return f"Scopus search: {status}. Try broader or different terms."
+    return _format_scopus_results(query, papers)
 
 
 # --------------------------------------------------------------------------- #

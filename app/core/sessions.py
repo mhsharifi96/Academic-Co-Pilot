@@ -176,6 +176,10 @@ class SessionManager:
         """Synchronous wrapper around get_files()."""
         return self._run_sync(self.get_files(session_id))
 
+    def sync_add_files(self, session_id: str, file_paths: List[str]) -> None:
+        """Synchronous wrapper around add_files()."""
+        return self._run_sync(self.add_files(session_id, file_paths))
+
     def sync_get_plan(self, session_id: str) -> List[Dict[str, Any]]:
         """Synchronous wrapper around get_plan()."""
         return self._run_sync(self.get_plan(session_id))

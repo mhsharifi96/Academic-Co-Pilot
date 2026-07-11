@@ -74,7 +74,7 @@ This file defines the skills (tools) available to the Academic Co-Pilot Agent.
     *   `feedback` (Optional[str]): Optional focus or extra considerations for the summary.
 
 ## 12. Literature Search (`search_literature`)
-*   **Description:** Searches arXiv (free, no API key) for academic papers matching a query. Use this to discover relevant literature that has NOT been uploaded yet — returns title, authors, year, arXiv id/link, and an abstract snippet. Read-only (no approval).
+*   **Description:** Searches multiple academic indexes for papers matching a query: Scopus/Elsevier first when `ELSEVIER_API_KEY` is configured, arXiv next for recent preprints, and Crossref last as a DOI/metadata fallback. Use this for "find papers" or "find a paper by title/topic" requests, especially when recent 2025/2026 work may not appear as Crossref's top result. Read-only (no approval).
 *   **Inputs:**
     *   `query` (str): Search terms.
     *   `max_results` (int, default=8): Maximum number of papers to return (capped at 25).
@@ -100,7 +100,7 @@ This file defines the skills (tools) available to the Academic Co-Pilot Agent.
     *   `status` (str): `in_progress`, `done`, or `pending`.
 
 ## 16. Scopus Search (`search_scopus`)
-*   **Description:** Searches Elsevier's Scopus for peer-reviewed / indexed academic literature, including citation counts. Complements `search_literature` (arXiv preprints) by covering published, indexed work across publishers. Requires `ELSEVIER_API_KEY` on the server; reports a friendly message when unset. Plain keywords are matched against title/abstract/keywords; Scopus boolean syntax is also accepted. Read-only (no approval).
+*   **Description:** Searches Elsevier's Scopus for peer-reviewed / indexed academic literature, including citation counts. Use directly when the user specifically asks for Scopus/Elsevier results; otherwise `search_literature` already tries Scopus first. Requires `ELSEVIER_API_KEY` on the server; reports a friendly message when unset. Plain keywords are matched against title/abstract/keywords; Scopus boolean syntax is also accepted. Read-only (no approval).
 *   **Inputs:**
     *   `query` (str): Search terms or a Scopus boolean query.
     *   `max_results` (int, default=10): Maximum number of results (capped at 25).
@@ -111,25 +111,30 @@ This file defines the skills (tools) available to the Academic Co-Pilot Agent.
     *   `query` (str): Search terms, matched against title/abstract/full text.
     *   `max_results` (int, default=8): Maximum number of works (capped at 25).
 
-## 18. Reference Checker (`validate_references`)
+## 18. Open Access PDF Finder (`find_and_ingest_open_access_pdf`) **[Requires Approval]**
+*   **Description:** Searches open academic metadata for an open-access PDF URL, downloads only verified PDF responses, saves the PDF under the current session, ingests it into the vector store, and attaches it to the session file list. Use when the user asks to find an open-access PDF online and add/read it in the conversation. Writes and ingests a file → gated by approval when enabled.
+*   **Inputs:**
+    *   `query_or_doi` (str): DOI, paper title, or focused paper search query.
+
+## 19. Reference Checker (`validate_references`)
 *   **Description:** Audits the references in a paper on two axes: (1) every DOI/URL is resolved over the network so dead or fabricated links are flagged, and (2) a *powerful* model checks that each reference looks real and that the in-text claims citing it are actually supported — flagging likely hallucinated or mis-attributed citations. Use before finalizing a paper or to vet drafts. Read-only (no approval).
 *   **Inputs:**
     *   `paper_text` (str): The paper/section text, including its reference list.
     *   `references` (str, optional): The reference list, if not already in `paper_text`.
 
-## 19. Text Humanizer (`humanize_text`)
+## 20. Text Humanizer (`humanize_text`)
 *   **Description:** Rewrites text (typically AI-drafted) so it reads as natural, varied human prose — reducing AI-writing-detector signals — while strictly preserving meaning, facts, numbers, and citations. Uses a *powerful* model. Read-only (no approval).
 *   **Inputs:**
     *   `text` (str): The text to humanize.
     *   `tone` (str, default='academic'): Desired tone/register.
 
-## 20. Infographic Generator (`generate_infographic`) **[Requires Approval]**
+## 21. Infographic Generator (`generate_infographic`) **[Requires Approval]**
 *   **Description:** Turns a brief (abstract, findings, key points) into an infographic image. A model first designs a layout prompt, then an image model (`IMAGE_MODEL`, default `gpt-image-1`) renders it; the PNG is saved under `output_figures/`. On-image text is kept short (image models render long text imperfectly). Writes a file → gated by approval when enabled.
 *   **Inputs:**
     *   `brief` (str): What the infographic should convey.
     *   `title` (str, optional): Title to feature on the infographic.
 
-## 21. Venue Suggester (`suggest_venues`)
+## 22. Venue Suggester (`suggest_venues`)
 *   **Description:** Suggests journals, conferences, and publishers to submit to, by aggregating where the most relevant existing papers were published (via OpenAlex). Returns ranked venues with type, publisher, number of matching papers, and average citations. Read-only (no approval).
 *   **Inputs:**
     *   `topic_or_abstract` (str): The paper's topic, title, or abstract.

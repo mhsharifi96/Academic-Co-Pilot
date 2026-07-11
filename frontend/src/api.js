@@ -101,7 +101,8 @@ export async function getDownload(jobId) {
 }
 
 export async function listDownloads(sessionId) {
-  return request(`/downloads?session_id=${encodeURIComponent(sessionId)}`);
+  const qs = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
+  return request(`/downloads${qs}`);
 }
 
 // ----- Account / admin -----

@@ -32,6 +32,12 @@ export default function SessionBar({
         >
           Guidelines
         </button>
+        <button
+          className={`nav-link${view === "downloads" ? " active" : ""}`}
+          onClick={() => onNavigate("downloads")}
+        >
+          Downloads
+        </button>
         {user?.is_admin && (
           <button
             className={`nav-link${view === "admin" ? " active" : ""}`}

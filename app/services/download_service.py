@@ -83,7 +83,7 @@ def normalize_doi(raw: str) -> str:
     s = (raw or "").strip()
     s = re.sub(r"^https?://(dx\.)?doi\.org/", "", s, flags=re.IGNORECASE)
     s = re.sub(r"^doi:\s*", "", s, flags=re.IGNORECASE)
-    s = s.strip().rstrip(".,;)")
+    s = s.strip().rstrip(".,;:)]*")
     if not _DOI_RE.match(s):
         raise InvalidDOI(f"'{raw}' is not a valid DOI.")
     return s
@@ -436,6 +436,16 @@ async def list_jobs_for_session(
             DownloadJob.user_id == user.id,
             DownloadJob.session_id == session_id,
         )
+        .order_by(DownloadJob.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
+async def list_jobs_for_user(db: AsyncSession, user: User) -> List[DownloadJob]:
+    """All download jobs owned by ``user`` across every session, newest first."""
+    result = await db.execute(
+        select(DownloadJob)
+        .where(DownloadJob.user_id == user.id)
         .order_by(DownloadJob.created_at.desc())
     )
     return list(result.scalars().all())

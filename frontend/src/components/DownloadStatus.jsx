@@ -35,10 +35,13 @@ function icon(status) {
 // failure choices (upload your own PDF / continue without it).
 export default function DownloadStatus({
   sessionId,
+  allSessions = false,
   reloadToken,
   onIngested,
   onUploadPdf,
   onContinueWithout,
+  allowDismiss = true,
+  emptyMessage = null,
 }) {
   const [jobs, setJobs] = useState([]);
   const [dismissed, setDismissed] = useState({}); // jobId -> true
@@ -47,7 +50,7 @@ export default function DownloadStatus({
   const uploadForRef = useRef(null); // job whose "upload" was clicked
 
   useEffect(() => {
-    if (!sessionId) {
+    if (!sessionId && !allSessions) {
       setJobs([]);
       return;
     }
@@ -56,7 +59,7 @@ export default function DownloadStatus({
 
     async function poll() {
       try {
-        const resp = await listDownloads(sessionId);
+        const resp = await listDownloads(allSessions ? undefined : sessionId);
         if (cancelled) return;
         const list = resp.jobs || [];
         setJobs(list);
@@ -81,7 +84,7 @@ export default function DownloadStatus({
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [sessionId, reloadToken, onIngested]);
+  }, [sessionId, allSessions, reloadToken, onIngested]);
 
   const onPickUpload = useCallback(
     (e) => {
@@ -99,7 +102,9 @@ export default function DownloadStatus({
   );
 
   const visible = jobs.filter((j) => !dismissed[j.id]);
-  if (visible.length === 0) return null;
+  if (visible.length === 0) {
+    return emptyMessage ? <div className="download-empty">{emptyMessage}</div> : null;
+  }
 
   return (
     <div className="download-status">
@@ -117,6 +122,11 @@ export default function DownloadStatus({
             <div className="dl-head">
               <span className="dl-icon">{icon(job.status)}</span>
               <code className="dl-doi">{job.doi}</code>
+              {allSessions && (
+                <code className="dl-session" title={job.session_id}>
+                  {job.session_id}
+                </code>
+              )}
               <span className="dl-tier">{job.service_tier}</span>
             </div>
             <div className="dl-label">{label(job)}</div>
@@ -153,8 +163,9 @@ export default function DownloadStatus({
               </>
             )}
 
-            {(job.status === "SUCCEEDED" ||
-              (job.status === "FAILED" && !notFound)) && (
+            {allowDismiss &&
+              (job.status === "SUCCEEDED" ||
+                (job.status === "FAILED" && !notFound)) && (
               <div className="dl-actions">
                 <button
                   className="ghost"

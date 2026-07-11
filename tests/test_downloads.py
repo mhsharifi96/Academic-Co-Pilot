@@ -34,6 +34,8 @@ def test_normalize_doi_accepts_bare_and_url_forms():
     assert svc.normalize_doi("http://dx.doi.org/" + target) == target
     # Trailing sentence punctuation is stripped.
     assert svc.normalize_doi(target + ").") == target
+    # Markdown emphasis markers from rendered assistant messages are stripped.
+    assert svc.normalize_doi("10.57230/ejplt242tdmcdv**") == "10.57230/ejplt242tdmcdv"
 
 
 def test_normalize_doi_rejects_non_doi():

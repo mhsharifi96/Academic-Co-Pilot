@@ -4,18 +4,24 @@ import { createDownload } from "../api.js";
 // Confirmation modal shown when the user clicks "Get PDF" on a detected DOI.
 // Displays the DOI and submits a download request to the queue.
 export default function DownloadModal({ doi, sessionId, onClose, onCreated }) {
+  const [draftDoi, setDraftDoi] = useState(doi || "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
   async function submit() {
+    const trimmed = draftDoi.trim();
     if (!sessionId) {
       setError("Send a message first so this download has a conversation to attach to.");
+      return;
+    }
+    if (!trimmed) {
+      setError("Enter a DOI.");
       return;
     }
     setSubmitting(true);
     setError(null);
     try {
-      const resp = await createDownload(sessionId, doi);
+      const resp = await createDownload(sessionId, trimmed);
       onCreated?.(resp);
       onClose();
     } catch (e) {
@@ -36,7 +42,12 @@ export default function DownloadModal({ doi, sessionId, onClose, onCreated }) {
         </p>
         <div className="modal-doi">
           <span className="modal-doi-label">DOI</span>
-          <code>{doi}</code>
+          <input
+            value={draftDoi}
+            onChange={(e) => setDraftDoi(e.target.value)}
+            disabled={submitting}
+            autoFocus
+          />
         </div>
 
         {error && <div className="modal-err">{error}</div>}

@@ -9,6 +9,7 @@ Fixture-free so the suite also runs under tests/run_all.py.
 from app.tools.literature import (
     _parse_arxiv_atom,
     _format_crossref_work,
+    _parse_crossref_results,
     _bibtex_key,
     _parse_scopus_results,
     _scopus_link,
@@ -94,6 +95,31 @@ def test_format_crossref_handles_missing_fields():
     assert "Untitled-ish" in out
     assert "(unknown)" in out          # missing authors/year/venue
     assert "@misc{anon" in out         # non-journal -> misc, no authors -> anon key
+
+
+def test_parse_crossref_results_prefers_online_year_and_link():
+    data = {
+        "message": {
+            "items": [
+                {
+                    "title": ["Fresh RAG Systems"],
+                    "author": [{"given": "Ada", "family": "Lovelace"}],
+                    "published-online": {"date-parts": [[2026, 2, 3]]},
+                    "issued": {"date-parts": [[2025]]},
+                    "container-title": ["AI Journal"],
+                    "DOI": "10.1000/fresh",
+                    "type": "journal-article",
+                }
+            ]
+        }
+    }
+    papers = _parse_crossref_results(data)
+    assert len(papers) == 1
+    assert papers[0]["title"] == "Fresh RAG Systems"
+    assert papers[0]["authors"] == "Ada Lovelace"
+    assert papers[0]["year"] == "2026"
+    assert papers[0]["venue"] == "AI Journal"
+    assert papers[0]["link"] == "https://doi.org/10.1000/fresh"
 
 
 _SCOPUS_RESPONSE = {
