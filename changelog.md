@@ -72,6 +72,29 @@ authentication and persistence layer on top of the original agent MVP:
     an additive token block, SVG icons instead of emoji, staggered reveals that
     respect `prefers-reduced-motion`, and an `html[dir="rtl"]` patch block for
     the older physically-positioned chat chrome.
+- **Chat UI/UX pass.** Audited the chat surface in a real browser against the
+  `ui-ux-pro-max` rule set and fixed what the measurements flagged:
+  - **Reading column.** Messages ran edge-to-edge across the pane; the
+    transcript and the composer now share a centred 56rem column, and message
+    text is 15px/1.65 (was 14px/1.5) since assistant replies are prose.
+  - **Scroll position is no longer stolen.** The window auto-scrolled on every
+    update, so a reply landing while you read back yanked you to the bottom.
+    It now follows only when you are already there, and offers a *Jump to
+    latest* pill when you are not.
+  - **Screen readers announce replies.** The transcript is a
+    `role="log"` / `aria-live="polite"` region; previously a new answer was
+    silent. The composer, the file input and the open-by-key field gained
+    accessible names, and the rename/delete buttons gained labels naming the
+    chat they act on.
+  - **Hit areas.** The rename/delete controls were 21×21px — kept visually
+    small but given a 44×44 target; Send 55×34 → 86×40, session title 22 → 34,
+    nav links 32 → 36.
+  - **Typing indicator.** The static "Co-Pilot is thinking…" line is now an
+    animated three-dot bubble shaped like the reply that is coming.
+  - **Icons.** `WizardIcon` is generalised to `Icon` and the chat's `✎`/`✕`/`+`
+    glyphs are SVG, matching the wizard surface; emoji can't take a colour
+    token and mean nothing to a screen reader.
+  - A shared focus-visible ring across chat, composer and sidebar controls.
 - **`feature.md` — complete feature catalogue.** A single document listing every
   user-facing capability grouped by area (the two agents and session binding,
   guardrails and HITL, literature discovery across Scopus/arXiv/Crossref/OpenAlex,

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import * as api from "../api.js";
 import { useT } from "../i18n.js";
 import WizardEditor from "./WizardEditor.jsx";
-import WizardIcon from "./WizardIcon.jsx";
+import Icon from "./Icon.jsx";
 
 // Admin panel for guided workflows: the list, plus create / publish / delete.
 // Editing a wizard's fields and steps happens in WizardEditor.
@@ -136,7 +136,7 @@ export default function WizardAdminPanel() {
               {wizards.map((w) => (
                 <li key={w.id} className="wz-run-row">
                   <span className="wz-run-icon">
-                    <WizardIcon name={w.icon} size={18} />
+                    <Icon name={w.icon} size={18} />
                   </span>
                   <span className="wz-run-body">
                     <span className="wz-run-title">{w.name}</span>

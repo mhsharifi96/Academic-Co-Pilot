@@ -1,4 +1,4 @@
-// Inline stroke icons for the wizard surface.
+// The app's inline stroke icon set.
 //
 // Deliberately SVG rather than the emoji used elsewhere in this app: emoji
 // render differently on every platform, can't inherit colour, and read as
@@ -70,6 +70,16 @@ const PATHS = {
       <path d="M12 7.5V12l3 1.8" />
     </>
   ),
+  pencil: (
+    <>
+      <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z" />
+      <path d="M13.5 6.5l4 4" />
+    </>
+  ),
+  close: <path d="m6 6 12 12M18 6 6 18" />,
+  plus: <path d="M12 5v14M5 12h14" />,
+  send: <path d="M4.5 12 20 4.5 15.5 20l-3.6-5.9L4.5 12z" />,
+  chevronDown: <path d="m6 9.5 6 6 6-6" />,
 };
 
 export const WIZARD_ICON_KEYS = [
@@ -83,7 +93,7 @@ export const WIZARD_ICON_KEYS = [
   "sparkles",
 ];
 
-export default function WizardIcon({ name, size = 24, className = "" }) {
+export default function Icon({ name, size = 24, className = "" }) {
   const path = PATHS[name] || PATHS.compass;
   return (
     <svg

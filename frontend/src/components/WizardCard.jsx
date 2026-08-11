@@ -1,5 +1,5 @@
 import { useT } from "../i18n.js";
-import WizardIcon from "./WizardIcon.jsx";
+import Icon from "./Icon.jsx";
 
 // One wizard in the landing grid.  The whole card is a single button so there
 // is one focus stop and one 44px+ target, rather than a card with a small link
@@ -17,7 +17,7 @@ export default function WizardCard({ wizard, index = 0, onOpen }) {
       <span className="wz-card-glow" aria-hidden="true" />
 
       <span className="wz-card-icon">
-        <WizardIcon name={wizard.icon} size={22} />
+        <Icon name={wizard.icon} size={22} />
       </span>
 
       <span className="wz-card-body">
@@ -33,7 +33,7 @@ export default function WizardCard({ wizard, index = 0, onOpen }) {
         </span>
         <span className="wz-card-go">
           {t("wizard.start")}
-          <WizardIcon name="arrow" size={16} className="wz-go-arrow" />
+          <Icon name="arrow" size={16} className="wz-go-arrow" />
         </span>
       </span>
     </button>

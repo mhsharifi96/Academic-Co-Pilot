@@ -65,6 +65,7 @@ export default function FileSidebar({ files, onUpload, onInsertPath, busy }) {
           accept=".pdf,.csv"
           multiple
           hidden
+          aria-label="Upload PDF or CSV files"
           onChange={onPick}
           disabled={busy}
         />

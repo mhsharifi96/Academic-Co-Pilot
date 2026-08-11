@@ -1,7 +1,8 @@
 import { useState } from "react";
+import Icon from "./Icon.jsx";
 
 // Left-rail list of past sessions (sourced from localStorage in App).
-// Click to load, double-click / ✎ to rename inline, ✕ to delete.
+// Click to load, double-click or the pencil to rename inline, the cross to delete.
 export default function SessionList({
   sessions,
   activeId,
@@ -38,13 +39,15 @@ export default function SessionList({
       <div className="session-list-head">
         <h3>Chats</h3>
         <button className="new-chat" onClick={onNew} title="Start a new chat">
-          + New
+          <Icon name="plus" size={14} />
+          New
         </button>
       </div>
 
       <div className="open-by-key">
         <input
           value={keyInput}
+          aria-label="Open a chat by session key"
           placeholder="Paste session key…"
           onChange={(e) => setKeyInput(e.target.value)}
           onKeyDown={(e) => {
@@ -94,19 +97,25 @@ export default function SessionList({
               )}
 
               <span className="session-actions">
+                {/* SVG, not "✎"/"✕": those are font-dependent glyphs that can't
+                    take a colour token and mean nothing to a screen reader.
+                    The name of the chat goes in the label so the action is
+                    unambiguous when read out of context. */}
                 <button
                   className="icon"
                   title="Rename"
+                  aria-label={`Rename “${s.title || "Untitled chat"}”`}
                   onClick={() => startRename(s)}
                 >
-                  ✎
+                  <Icon name="pencil" size={15} />
                 </button>
                 <button
                   className="icon danger"
                   title="Delete chat"
+                  aria-label={`Delete “${s.title || "Untitled chat"}”`}
                   onClick={() => onDelete(s.id)}
                 >
-                  ✕
+                  <Icon name="close" size={15} />
                 </button>
               </span>
             </li>

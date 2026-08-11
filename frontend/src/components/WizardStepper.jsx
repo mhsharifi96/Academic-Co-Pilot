@@ -1,5 +1,5 @@
 import { useT } from "../i18n.js";
-import WizardIcon from "./WizardIcon.jsx";
+import Icon from "./Icon.jsx";
 
 // Progress header for a run: where you are, what the step is called, and how
 // many turns remain before the workflow moves on.  Progress is expressed both
@@ -35,7 +35,7 @@ export default function WizardStepper({ run, onFinishStep, finishing, suggested 
         )}
         {done && (
           <span className="wz-chip done">
-            <WizardIcon name="check" size={14} />
+            <Icon name="check" size={14} />
             {t("runner.completedTitle")}
           </span>
         )}
@@ -55,7 +55,7 @@ export default function WizardStepper({ run, onFinishStep, finishing, suggested 
             {finishing
               ? t("common.saving")
               : t(index >= total ? "runner.finishWorkflow" : "runner.finishStep")}
-            <WizardIcon name="arrow" size={15} className="wz-go-arrow" />
+            <Icon name="arrow" size={15} className="wz-go-arrow" />
           </button>
         )}
       </div>

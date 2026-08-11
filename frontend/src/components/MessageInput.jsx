@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import Icon from "./Icon.jsx";
 import MentionDropdown from "./MentionDropdown.jsx";
 
 // Detect an in-progress "@mention" immediately before the caret.
@@ -139,6 +140,9 @@ export default function MessageInput({
           value={value}
           placeholder={placeholder}
           disabled={disabled}
+          // The placeholder is not an accessible name — it disappears as soon
+          // as the user types, and screen readers may skip it entirely.
+          aria-label="Message the Co-Pilot"
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onClick={refreshMention}
@@ -150,11 +154,12 @@ export default function MessageInput({
           }}
         />
         <button
-          className="primary"
+          className="primary send-btn"
           disabled={disabled || !value.trim()}
           onClick={() => onSend(value)}
         >
-          Send
+          <Icon name="send" size={16} />
+          <span>Send</span>
         </button>
       </div>
     </div>

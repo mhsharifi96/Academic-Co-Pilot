@@ -4,7 +4,7 @@ import { useT } from "../i18n.js";
 import { navigate } from "../router.js";
 import LangToggle from "./LangToggle.jsx";
 import WizardCard from "./WizardCard.jsx";
-import WizardIcon from "./WizardIcon.jsx";
+import Icon from "./Icon.jsx";
 
 // The public landing page: hero, the catalogue of published wizards, and a
 // short "how it works" band.  Renders for signed-out visitors, so it is mounted
@@ -45,7 +45,7 @@ export default function WizardLanding({ user }) {
     <div className="wz-landing">
       <header className="wz-topbar">
         <a className="wz-brand" href="#/">
-          <WizardIcon name="sparkles" size={20} />
+          <Icon name="sparkles" size={20} />
           <span>Academic Co-Pilot</span>
         </a>
         <div className="wz-topbar-actions">
@@ -64,7 +64,7 @@ export default function WizardLanding({ user }) {
         <div className="wz-hero-actions">
           <a className="wz-btn primary" href="#catalog">
             {t("landing.cta")}
-            <WizardIcon name="arrow" size={16} className="wz-go-arrow" />
+            <Icon name="arrow" size={16} className="wz-go-arrow" />
           </a>
           {user && (
             <button className="wz-btn ghost" onClick={() => navigate("/runs")}>
@@ -108,7 +108,7 @@ export default function WizardLanding({ user }) {
             <li key={s.title} className="wz-how-item">
               <span className="wz-how-num">{i + 1}</span>
               <span className="wz-how-icon">
-                <WizardIcon name={s.icon} size={20} />
+                <Icon name={s.icon} size={20} />
               </span>
               <h3>{s.title}</h3>
               <p>{s.body}</p>

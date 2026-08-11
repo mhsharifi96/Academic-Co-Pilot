@@ -3,7 +3,7 @@ import * as api from "../api.js";
 import { useT } from "../i18n.js";
 import { navigate } from "../router.js";
 import LangToggle from "./LangToggle.jsx";
-import WizardIcon from "./WizardIcon.jsx";
+import Icon from "./Icon.jsx";
 
 // Public detail page for one wizard: what it is and the path it walks you
 // through.  "Start" needs an account, so a signed-out visitor is sent to the
@@ -56,7 +56,7 @@ export default function WizardDetail({ slug, user, onRequireLogin }) {
     <div className="wz-landing">
       <header className="wz-topbar">
         <a className="wz-brand" href="#/">
-          <WizardIcon name="sparkles" size={20} />
+          <Icon name="sparkles" size={20} />
           <span>Academic Co-Pilot</span>
         </a>
         <div className="wz-topbar-actions">
@@ -81,7 +81,7 @@ export default function WizardDetail({ slug, user, onRequireLogin }) {
           <>
             <div className="wz-detail-head">
               <span className="wz-card-icon large">
-                <WizardIcon name={wizard.icon} size={28} />
+                <Icon name={wizard.icon} size={28} />
               </span>
               <div>
                 <h1 className="wz-detail-title">{wizard.title}</h1>
@@ -107,7 +107,7 @@ export default function WizardDetail({ slug, user, onRequireLogin }) {
                 : !user
                 ? t("wizard.signInToStart")
                 : t("wizard.startOrContinue")}
-              <WizardIcon name="arrow" size={18} className="wz-go-arrow" />
+              <Icon name="arrow" size={18} className="wz-go-arrow" />
             </button>
 
             <h2 className="wz-section-title small">{t("wizard.pathTitle")}</h2>

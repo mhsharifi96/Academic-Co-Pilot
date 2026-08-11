@@ -5,7 +5,7 @@ import { navigate } from "../router.js";
 import InterruptCard from "./InterruptCard.jsx";
 import LangToggle from "./LangToggle.jsx";
 import Message from "./Message.jsx";
-import WizardIcon from "./WizardIcon.jsx";
+import Icon from "./Icon.jsx";
 import WizardStepper from "./WizardStepper.jsx";
 
 // The guided chat for one run.
@@ -161,7 +161,7 @@ export default function WizardRunner({ runId }) {
     <div className="wz-runner">
       <header className="wz-topbar">
         <button className="wz-back" onClick={() => navigate("/runs")}>
-          <WizardIcon name="arrow" size={16} className="wz-back-arrow" />
+          <Icon name="arrow" size={16} className="wz-back-arrow" />
           <span>{t("nav.myRuns")}</span>
         </button>
         <span className="wz-runner-title">{run?.wizard_title || ""}</span>
@@ -193,7 +193,7 @@ export default function WizardRunner({ runId }) {
           <>
             {messages.length === 0 && !interrupt && (
               <div className="wz-thread-welcome">
-                <WizardIcon name="play" size={22} />
+                <Icon name="play" size={22} />
                 <p>{t("runner.welcome")}</p>
                 {run?.current_step?.name && <strong>{run.current_step.name}</strong>}
               </div>
@@ -205,7 +205,7 @@ export default function WizardRunner({ runId }) {
 
             {notice && (
               <div className="wz-notice" role="status">
-                <WizardIcon name="check" size={16} />
+                <Icon name="check" size={16} />
                 <span>{notice}</span>
               </div>
             )}
@@ -214,7 +214,7 @@ export default function WizardRunner({ runId }) {
                 the header, because that's where the user is reading. */}
             {suggested && !done && !abandoned && (
               <div className="wz-suggest" role="status">
-                <WizardIcon name="check" size={18} />
+                <Icon name="check" size={18} />
                 <div className="wz-suggest-body">
                   <strong>{t("runner.suggestTitle")}</strong>
                   <span>{t("runner.suggestBody")}</span>
@@ -232,7 +232,7 @@ export default function WizardRunner({ runId }) {
                     disabled={finishing}
                   >
                     {finishing ? t("common.saving") : t("runner.suggestGo")}
-                    <WizardIcon name="arrow" size={15} className="wz-go-arrow" />
+                    <Icon name="arrow" size={15} className="wz-go-arrow" />
                   </button>
                 </div>
               </div>
@@ -251,7 +251,7 @@ export default function WizardRunner({ runId }) {
 
             {done && (
               <div className="wz-complete">
-                <WizardIcon name="check" size={28} />
+                <Icon name="check" size={28} />
                 <h2>{t("runner.completedTitle")}</h2>
                 <p>{t("runner.completedBody")}</p>
                 <div className="wz-hero-actions">

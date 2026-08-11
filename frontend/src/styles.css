@@ -722,13 +722,32 @@ button.ghost {
 }
 
 /* ---------- Chat ---------- */
-.chat-window {
-  flex: 1;
+/* The scroll container. Split from .chat-window so the message column can be
+   centred and width-limited while the scrollbar stays at the edge of the pane. */
+.chat-scroll {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0; /* let the flex item shrink so THIS scrolls, not the page */
   overflow-y: auto;
-  padding: 22px 28px;
+  scroll-behavior: smooth;
+}
+
+/* Long assistant answers are prose, so the column is capped at a readable
+   measure and centred instead of running edge-to-edge across a wide window. */
+.chat-window {
+  width: 100%;
+  max-width: 56rem;
+  margin-inline: auto;
+  padding: 22px 28px 8px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-scroll {
+    scroll-behavior: auto;
+  }
 }
 
 .welcome {
@@ -749,10 +768,15 @@ button.ghost {
 }
 
 .msg {
-  max-width: 760px;
+  max-width: 46rem;
   padding: 12px 16px;
   border-radius: var(--radius);
   white-space: normal;
+  /* Assistant replies are read, not skimmed: 15px/1.65 over the app's 14px/1.5
+     is the difference between a UI label and something you can read a paragraph
+     of without losing your place. */
+  font-size: 15px;
+  line-height: 1.65;
 }
 
 .msg.user {
@@ -1268,11 +1292,16 @@ button.ghost {
 }
 
 .composer .hint {
-  position: absolute;
-  top: -8px;
-  right: 20px;
+  /* In-flow inside the centred composer column rather than pinned to the pane
+     edge, so it reads as a caption on the input instead of floating loose. */
+  display: block;
+  width: 100%;
+  max-width: 56rem;
+  margin: 0 auto 6px;
+  padding-inline: 2px;
   font-size: 11px;
   color: var(--muted);
+  text-align: end;
 }
 
 .mention-dropdown {
@@ -2460,10 +2489,6 @@ html[dir="rtl"] .dl-tier {
   margin-left: 0;
   margin-right: auto;
 }
-html[dir="rtl"] .composer .hint {
-  right: auto;
-  left: 20px;
-}
 html[dir="rtl"] .doi-chip .doi-code {
   margin-left: 0;
   margin-right: 4px;
@@ -2590,4 +2615,186 @@ html[dir="rtl"] .msg.assistant {
   .wz-suggest-actions .wz-btn {
     flex: 1;
   }
+}
+
+/* =========================================================================
+   Chat surface — UX pass
+   ========================================================================= */
+
+/* ---------- Hit areas ----------
+   The small controls were 21-27px tall. The visual size is kept (a 44px pencil
+   in a sidebar row would be absurd) and the *target* is grown with padding, so
+   pointer and touch accuracy improve without the layout changing shape. */
+.session-actions .icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  position: relative;
+  color: var(--muted);
+}
+.session-actions .icon::after {
+  /* Invisible 44x44 target centred on the button. */
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+.session-actions .icon:hover {
+  color: var(--text);
+}
+.session-actions .icon.danger:hover {
+  color: var(--red);
+}
+
+.nav-link {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+}
+.new-chat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+}
+.session-title {
+  min-height: 34px;
+}
+.lang-option {
+  min-height: 34px;
+}
+
+.send-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding-inline: 16px;
+}
+
+/* ---------- Focus visibility ----------
+   Every interactive element in the chat gets the same ring. Focus was
+   previously only styled on a few inputs, so keyboard users lost their place. */
+.chat-scroll button:focus-visible,
+.composer button:focus-visible,
+.composer textarea:focus-visible,
+.session-list button:focus-visible,
+.session-list input:focus-visible,
+.topbar button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* ---------- Welcome / empty state ---------- */
+.welcome-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 4px;
+  border-radius: 16px;
+  background: rgba(91, 140, 255, 0.12);
+  border: 1px solid rgba(91, 140, 255, 0.28);
+  color: var(--accent);
+}
+
+/* ---------- Typing indicator ----------
+   Shaped like the reply that is coming, rather than a line of text that reads
+   as content. */
+.typing-bubble {
+  align-self: flex-start;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+.typing-dots {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+}
+.typing-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  animation: typing-bounce 1.25s var(--ease-out) infinite;
+}
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.16s;
+}
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.32s;
+}
+@keyframes typing-bounce {
+  0%, 60%, 100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+}
+
+/* ---------- "Jump to latest" ----------
+   Shown only once the user has scrolled away from the newest message, so a
+   reply arriving while they read back never yanks them to the bottom. */
+.jump-latest {
+  position: sticky;
+  bottom: 14px;
+  inset-inline: 0;
+  margin-inline: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  min-height: 36px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+  animation: wz-rise 220ms var(--ease-out) both;
+  z-index: 3;
+}
+.jump-latest:hover {
+  border-color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typing-dots span,
+  .jump-latest {
+    animation: none;
+  }
+  .typing-dots span {
+    opacity: 0.7;
+  }
+}
+
+@media (max-width: 640px) {
+  .chat-window {
+    padding-inline: 14px;
+  }
+  .msg {
+    max-width: 100%;
+  }
+}
+
+/* The composer shares the transcript's reading column so the input lines up
+   with the messages it produces instead of spanning the whole pane. */
+.composer-inner {
+  width: 100%;
+  max-width: 56rem;
+  margin-inline: auto;
 }

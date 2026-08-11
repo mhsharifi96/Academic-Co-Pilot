@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import * as api from "../api.js";
 import { useT } from "../i18n.js";
-import WizardIcon, { WIZARD_ICON_KEYS } from "./WizardIcon.jsx";
+import Icon, { WIZARD_ICON_KEYS } from "./Icon.jsx";
 
 const EMPTY_STEP = {
   name_en: "",
@@ -218,7 +218,7 @@ export default function WizardEditor({ wizardId, onClose, onSaved }) {
                 aria-label={key}
                 title={key}
               >
-                <WizardIcon name={key} size={20} />
+                <Icon name={key} size={20} />
               </button>
             ))}
           </div>

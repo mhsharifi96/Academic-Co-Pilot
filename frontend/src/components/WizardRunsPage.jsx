@@ -3,7 +3,7 @@ import * as api from "../api.js";
 import { useT } from "../i18n.js";
 import { navigate } from "../router.js";
 import LangToggle from "./LangToggle.jsx";
-import WizardIcon from "./WizardIcon.jsx";
+import Icon from "./Icon.jsx";
 
 function RunRow({ run, label }) {
   const { t, lang } = useT();
@@ -13,7 +13,7 @@ function RunRow({ run, label }) {
   return (
     <li className="wz-run-row">
       <span className={`wz-run-icon${done ? " done" : ""}`}>
-        <WizardIcon name={done ? "check" : "play"} size={18} />
+        <Icon name={done ? "check" : "play"} size={18} />
       </span>
       <span className="wz-run-body">
         <span className="wz-run-title">{run.wizard_title}</span>
@@ -66,7 +66,7 @@ export default function WizardRunsPage() {
     <div className="wz-landing">
       <header className="wz-topbar">
         <a className="wz-brand" href="#/">
-          <WizardIcon name="sparkles" size={20} />
+          <Icon name="sparkles" size={20} />
           <span>Academic Co-Pilot</span>
         </a>
         <div className="wz-topbar-actions">
