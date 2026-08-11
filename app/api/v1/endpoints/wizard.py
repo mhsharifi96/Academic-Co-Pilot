@@ -297,6 +297,7 @@ def _turn_response(
     interrupt: Optional[Dict[str, Any]] = None,
     outcome: Optional[svc.TurnOutcome] = None,
     balance: Optional[float] = None,
+    step_complete_suggested: bool = False,
 ) -> WizardTurnResponse:
     ordered = svc.ordered_steps(steps)
     current = next((s for s in ordered if s.id == run.current_step_id), None)
@@ -309,6 +310,7 @@ def _turn_response(
         run_status=run.status,
         step_advanced=bool(outcome and outcome.advanced),
         completed=bool(outcome and outcome.completed),
+        step_complete_suggested=step_complete_suggested,
         current_step=_step_public(current, lang) if current else None,
         current_step_index=svc.step_number(ordered, run.current_step_id),
         total_steps=len(ordered),
@@ -448,7 +450,10 @@ async def _finish_turn(
         )
 
     await session_manager.set_pending_interrupt(run.session_id, None)
-    reply = final_text(result)
+    # The agent may end its reply with a "this step is done" marker. Strip it
+    # before anything is persisted or shown — the user must never see it — and
+    # carry it back as a flag the UI turns into a "Finish step" offer.
+    reply, suggested = svc.extract_completion_signal(final_text(result))
     await svc.append_message(db, run, current.id, ROLE_ASSISTANT, reply)
     balance = await charge_usage(db, user, usage, run.session_id)
     outcome = await svc.record_turn(db, run, steps)
@@ -460,6 +465,45 @@ async def _finish_turn(
         status="complete",
         outcome=outcome,
         balance=balance_of(balance),
+        # Only worth offering while the step is still the current one — the cap
+        # may already have moved the run on, in which case the offer is moot.
+        step_complete_suggested=suggested and not outcome.advanced and not outcome.completed,
+    )
+
+
+@router.post("/wizard-runs/{run_id}/advance", response_model=WizardTurnResponse)
+async def advance_step(
+    run_id: str,
+    lang: str = LangQuery,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> WizardTurnResponse:
+    """
+    Finish the current step now, without using up its message cap.
+
+    Backs the "Finish step" control, whether the user chose it themselves or
+    accepted the agent's suggestion. Finishing the last step completes the run.
+    Costs nothing: no agent call, so no tokens and no balance.
+    """
+    locale = svc.resolve_locale(lang)
+    run = await svc.get_owned_run(db, current_user, run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found.")
+    if run.status != STATUS_ACTIVE:
+        raise HTTPException(
+            status_code=409, detail=f"This run is {run.status} and cannot advance."
+        )
+
+    _, steps = await _load_run_context(db, run)
+    if not any(s.id == run.current_step_id for s in steps):
+        raise HTTPException(
+            status_code=409,
+            detail="This run's current step no longer exists; start the wizard again.",
+        )
+
+    outcome = await svc.advance_run(db, run, steps)
+    return _turn_response(
+        run, steps, locale, response="", status="complete", outcome=outcome
     )
 
 

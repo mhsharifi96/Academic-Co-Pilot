@@ -109,6 +109,9 @@ class WizardTurnResponse(BaseModel):
     run_status: str
     step_advanced: bool = False
     completed: bool = False
+    # The agent judged this step's goal met and is offering to move on. Advisory
+    # only — the run does not advance until the user asks it to.
+    step_complete_suggested: bool = False
     current_step: Optional[WizardStepPublicOut] = None
     current_step_index: Optional[int] = None
     total_steps: int = 0

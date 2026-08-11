@@ -4,7 +4,7 @@ import WizardIcon from "./WizardIcon.jsx";
 // Progress header for a run: where you are, what the step is called, and how
 // many turns remain before the workflow moves on.  Progress is expressed both
 // as a bar and as text, so it never depends on colour or width alone.
-export default function WizardStepper({ run }) {
+export default function WizardStepper({ run, onFinishStep, finishing, suggested }) {
   const { t } = useT();
   if (!run) return null;
 
@@ -38,6 +38,25 @@ export default function WizardStepper({ run }) {
             <WizardIcon name="check" size={14} />
             {t("runner.completedTitle")}
           </span>
+        )}
+
+        {/* Always available so a step can end when the work is done rather than
+            when its message budget runs out. Highlighted once the agent has
+            said the step looks finished — but never auto-advancing: moving on
+            stays the user's decision. */}
+        {!done && onFinishStep && (
+          <button
+            type="button"
+            className={`wz-btn small wz-finish-step${suggested ? " suggested" : " ghost"}`}
+            onClick={onFinishStep}
+            disabled={finishing}
+            title={t(index >= total ? "runner.finishWorkflowHint" : "runner.finishStepHint")}
+          >
+            {finishing
+              ? t("common.saving")
+              : t(index >= total ? "runner.finishWorkflow" : "runner.finishStep")}
+            <WizardIcon name="arrow" size={15} className="wz-go-arrow" />
+          </button>
         )}
       </div>
 

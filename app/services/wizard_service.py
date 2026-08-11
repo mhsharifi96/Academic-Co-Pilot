@@ -178,6 +178,20 @@ def messages_left(current_count: int, max_messages: Optional[int]) -> Optional[i
     return max(0, limit - current_count)
 
 
+def apply_advance(*, next_step_id: Optional[str]) -> TurnOutcome:
+    """
+    Move to the next step regardless of the message cap.
+
+    Drives the explicit "Finish step" action (and the agent's suggestion, once
+    the user accepts it). The cap becomes a *ceiling* rather than the only way
+    forward, which is what makes an uncapped step usable — it now ends when the
+    work is done instead of parking the run forever.
+    """
+    if next_step_id is None:
+        return TurnOutcome(0, None, STATUS_COMPLETED, False, True)
+    return TurnOutcome(0, next_step_id, STATUS_ACTIVE, True, False)
+
+
 def apply_turn(
     *,
     current_count: int,
@@ -210,6 +224,40 @@ def apply_turn(
     if next_step_id is None:
         return TurnOutcome(new_count, None, STATUS_COMPLETED, False, True)
     return TurnOutcome(0, next_step_id, STATUS_ACTIVE, True, False)
+
+
+# --------------------------------------------------------------------------- #
+# Pure helpers — the agent's "this step looks done" signal
+# --------------------------------------------------------------------------- #
+# The agent marks a step finished by emitting this token; the endpoint strips it
+# before the reply is persisted or shown, and surfaces it as a flag so the UI can
+# offer "Finish step". A text marker rather than a tool: the wizard runs on the
+# shared agent, and a wizard-only tool would have to be hidden from every other
+# caller of default_tools.
+STEP_COMPLETE_MARKER = "[[STEP_COMPLETE]]"
+
+# Tolerate the shapes models actually produce: different bracket counts, spacing,
+# case, and a wrapping code fence or bold markers.
+_MARKER_RE = re.compile(
+    r"[`*_]*\[{1,2}\s*STEP[\s_-]*COMPLETE\s*\]{1,2}[`*_]*",
+    re.IGNORECASE,
+)
+
+
+def extract_completion_signal(text: str) -> tuple[str, bool]:
+    """
+    Split an assistant reply into (clean_text, step_looks_complete).
+
+    Returns the reply with every marker removed — the user must never see it —
+    and whether at least one was present.
+    """
+    raw = text or ""
+    if not _MARKER_RE.search(raw):
+        return raw, False
+    cleaned = _MARKER_RE.sub("", raw)
+    # Collapse the blank lines the removal leaves behind.
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+    return cleaned, True
 
 
 # --------------------------------------------------------------------------- #
@@ -251,6 +299,18 @@ def build_step_guidance(
             "step; the workflow then moves to the next step automatically. Do "
             "not announce step transitions yourself.",
         ]
+
+    parts += [
+        "",
+        "WHEN THIS STEP IS DONE: if the goal above has been met and there is "
+        f"nothing useful left to do here, append {STEP_COMPLETE_MARKER} as the "
+        "very last thing in your reply. It is stripped before the user sees it "
+        "— never mention it, never explain it, and never say the step is "
+        "finished in your own words. Moving on is the user's choice: they get "
+        "an option to continue, so do not act as if the next step has started. "
+        "Omit the marker entirely while there is still work to do in this step.",
+    ]
+
     if lang == "fa":
         parts += ["", "Respond in Persian (Farsi)."]
     return "\n".join(parts)
@@ -456,6 +516,35 @@ async def record_turn(
         max_messages=current.max_messages if current is not None else None,
         next_step_id=next_step_id(steps, run.current_step_id),
     )
+
+    run.step_message_count = outcome.step_message_count
+    if outcome.new_current_step_id is not None:
+        run.current_step_id = outcome.new_current_step_id
+    run.status = outcome.status
+    if outcome.completed:
+        run.completed_at = _now()
+    run.updated_at = _now()
+
+    await db.commit()
+    await db.refresh(run)
+    return outcome
+
+
+async def advance_run(
+    db: AsyncSession, run: WizardRun, steps: Sequence[WizardStep]
+) -> TurnOutcome:
+    """
+    Finish the current step now, ignoring its message cap.
+
+    Backs the user's explicit "Finish step" action. Same locking rationale as
+    ``record_turn``: the counter is re-read under the row lock so an advance
+    racing an in-flight turn can't be computed from stale state.
+    """
+    locked = await _lock_run(db, run.id)
+    if locked is not None:
+        run = locked
+
+    outcome = apply_advance(next_step_id=next_step_id(steps, run.current_step_id))
 
     run.step_message_count = outcome.step_message_count
     if outcome.new_current_step_id is not None:

@@ -76,6 +76,14 @@ const STRINGS = {
     "runner.discard": "Discard workflow",
     "runner.discardConfirm":
       "Discard this workflow? The conversation is kept but you can't add to it.",
+    "runner.finishStep": "Finish step",
+    "runner.finishStepHint": "Move to the next step now, without using the messages left here.",
+    "runner.finishWorkflow": "Finish workflow",
+    "runner.finishWorkflowHint": "This is the last step — finishing completes the workflow.",
+    "runner.suggestTitle": "This step looks done.",
+    "runner.suggestBody": "Move on when you're ready, or keep working on it.",
+    "runner.suggestStay": "Stay here",
+    "runner.suggestGo": "Next step",
     "runner.welcome": "Send a message to begin.",
     "runner.loading": "Loading your workflow…",
 
@@ -202,6 +210,14 @@ const STRINGS = {
     "runner.discard": "کنار گذاشتن مسیر",
     "runner.discardConfirm":
       "این مسیر کنار گذاشته شود؟ گفتگو می‌ماند اما نمی‌توانید چیزی به آن بیفزایید.",
+    "runner.finishStep": "پایان این گام",
+    "runner.finishStepHint": "همین حالا به گام بعد بروید، بدون مصرف پیام‌های باقی‌مانده.",
+    "runner.finishWorkflow": "پایان مسیر",
+    "runner.finishWorkflowHint": "این آخرین گام است — با پایان آن، مسیر کامل می‌شود.",
+    "runner.suggestTitle": "به نظر می‌رسد این گام تمام شده است.",
+    "runner.suggestBody": "هر وقت آماده بودید به گام بعد بروید، یا همین‌جا ادامه دهید.",
+    "runner.suggestStay": "همین‌جا می‌مانم",
+    "runner.suggestGo": "گام بعد",
     "runner.welcome": "برای شروع پیامی بفرستید.",
     "runner.loading": "در حال بارگذاری مسیر…",
 

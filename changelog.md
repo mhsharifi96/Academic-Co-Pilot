@@ -35,6 +35,16 @@ authentication and persistence layer on top of the original agent MVP:
     already resolved for that language and never expose `guideline_prompt`.
     Admin write schemas also accept the original field spellings
     (`gaurdline_prompt`, `max_masseage`) as aliases.
+  - **Three ways a step ends.** Its `max_messages` cap running out (automatic),
+    the user pressing **Finish step** (`POST /wizard-runs/{id}/advance` — no
+    agent call, so it costs nothing), or the user accepting the agent's
+    suggestion. The agent signals "this step's goal is met" by appending a
+    `[[STEP_COMPLETE]]` marker, which is stripped before the reply is persisted
+    or shown and returned as `step_complete_suggested`; it never auto-advances,
+    because moving on is the user's decision. A text marker rather than a tool,
+    since the wizard runs on the shared agent and a wizard-only tool would have
+    to be hidden from every other caller of `default_tools`. This also makes an
+    **uncapped step usable** — previously it parked the run forever.
   - Runs execute on the existing shared `AcademicAgent` — no third graph. Each
     run is backed by a real `ChatSession` (`agent_type="wizard"`) whose id is the
     LangGraph `thread_id`, so uploads and the history/plan endpoints work
@@ -51,13 +61,14 @@ authentication and persistence layer on top of the original agent MVP:
     shared by both endpoints.
   - Frontend: a public bilingual landing page plus the run/continue UI —
     `WizardLanding`, `WizardCard`, `WizardDetail`, `WizardRunner`,
-    `WizardStepper`, `WizardRunsPage`, `AdminWizardsPage`, `WizardEditor`,
-    `LangToggle`, `WizardIcon`. Two new dependency-free modules back them:
+    `WizardStepper` (sticky under the topbar, with the Finish control),
+    `WizardRunsPage`, `WizardAdminPanel` (a tab inside the existing Admin
+    page), `WizardEditor`, `LangToggle`, `WizardIcon`. Two new dependency-free modules back them:
     `frontend/src/i18n.js` (en/fa dictionary, `LangProvider`, `useT`, keeps
     `<html lang|dir>` in sync) and `frontend/src/router.js` (a small hash router
-    — `#/`, `#/wizards/:slug`, `#/runs/:id`, `#/runs`, `#/admin/wizards`, `#/app`
-    — mounted above the app's auth gate so the landing page is reachable while
-    signed out). Styling adds Crimson Pro / Atkinson Hyperlegible / Vazirmatn,
+    — `#/`, `#/wizards/:slug`, `#/runs/:id`, `#/runs`, `#/app` — mounted above
+    the app's auth gate so the landing page is reachable while signed out;
+    wizard administration is a tab in the Admin page, not a route). Styling adds Crimson Pro / Atkinson Hyperlegible / Vazirmatn,
     an additive token block, SVG icons instead of emoji, staggered reveals that
     respect `prefers-reduced-motion`, and an `html[dir="rtl"]` patch block for
     the older physically-positioned chat chrome.

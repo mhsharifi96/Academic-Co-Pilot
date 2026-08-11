@@ -67,7 +67,7 @@ All three use the same Postgres instance but are deliberately distinct subsystem
 ### Wizards (guided workflows)
 Admin-authored, ordered multi-step flows a user runs as a guided chat
 (`app/models/wizard.py`, `app/services/wizard_service.py`,
-`app/api/v1/endpoints/wizard.py`). Four things are easy to get wrong:
+`app/api/v1/endpoints/wizard.py`). Five things are easy to get wrong:
 
 1. **Wizard transcripts live in the app tables** (`wizard_messages`), not the
    checkpointer — the one exception to the rule above. The checkpointer still
@@ -86,6 +86,13 @@ Admin-authored, ordered multi-step flows a user runs as a guided chat
    Nth message is answered under the step it was sent on. The rule itself is the
    pure `apply_turn` (`>=` the cap; `NULL`/`0`/negative means unlimited),
    unit-tested in `tests/test_wizard.py` — change it there, not in the endpoint.
+5. **A step ends three ways**: the cap (automatic), the user's *Finish step*
+   (`apply_advance` / `POST /wizard-runs/{id}/advance`, which makes no agent call
+   and so is free), or the user accepting the agent's suggestion. The agent
+   suggests by appending `[[STEP_COMPLETE]]` to its reply;
+   `extract_completion_signal` strips it before the message is persisted *or*
+   shown and returns `step_complete_suggested`. It is advisory — never
+   auto-advance, moving on is the user's decision.
 
 Locale is a per-request `?lang=en|fa`: public/user routes return text already
 resolved for that language and never expose `guideline_prompt`; admin routes

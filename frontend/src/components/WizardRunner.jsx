@@ -23,6 +23,10 @@ export default function WizardRunner({ runId }) {
   const [draft, setDraft] = useState("");
   const [interrupt, setInterrupt] = useState(null);
   const [notice, setNotice] = useState("");
+  // The agent said this step's goal is met. Advisory only — the run stays put
+  // until the user chooses to move on.
+  const [suggested, setSuggested] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [booting, setBooting] = useState(true);
   const [error, setError] = useState("");
@@ -84,12 +88,28 @@ export default function WizardRunner({ runId }) {
           }
         : prev
     );
+    // A step that just advanced can't also be pending completion.
+    setSuggested(!!res.step_complete_suggested);
     if (res.completed) {
       setNotice("");
     } else if (res.step_advanced && res.current_step?.name) {
       setNotice(t("runner.advanced", { name: res.current_step.name }));
     } else {
       setNotice("");
+    }
+  }
+
+  async function finishStep() {
+    if (finishing) return;
+    setFinishing(true);
+    setError("");
+    try {
+      const res = await api.advanceWizardRun(runId, lang);
+      applyTurn(res, null); // response is empty — no agent call was made
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setFinishing(false);
     }
   }
 
@@ -155,7 +175,14 @@ export default function WizardRunner({ runId }) {
         </div>
       </header>
 
-      {run && <WizardStepper run={run} />}
+      {run && (
+        <WizardStepper
+          run={run}
+          onFinishStep={done || abandoned ? null : finishStep}
+          finishing={finishing}
+          suggested={suggested}
+        />
+      )}
 
       <div className="wz-thread">
         {error && <div className="banner-error">⚠️ {error}</div>}
@@ -180,6 +207,34 @@ export default function WizardRunner({ runId }) {
               <div className="wz-notice" role="status">
                 <WizardIcon name="check" size={16} />
                 <span>{notice}</span>
+              </div>
+            )}
+
+            {/* The agent thinks this step is done. Offered inline as well as in
+                the header, because that's where the user is reading. */}
+            {suggested && !done && !abandoned && (
+              <div className="wz-suggest" role="status">
+                <WizardIcon name="check" size={18} />
+                <div className="wz-suggest-body">
+                  <strong>{t("runner.suggestTitle")}</strong>
+                  <span>{t("runner.suggestBody")}</span>
+                </div>
+                <div className="wz-suggest-actions">
+                  <button
+                    className="wz-btn ghost small"
+                    onClick={() => setSuggested(false)}
+                  >
+                    {t("runner.suggestStay")}
+                  </button>
+                  <button
+                    className="wz-btn primary small"
+                    onClick={finishStep}
+                    disabled={finishing}
+                  >
+                    {finishing ? t("common.saving") : t("runner.suggestGo")}
+                    <WizardIcon name="arrow" size={15} className="wz-go-arrow" />
+                  </button>
+                </div>
               </div>
             )}
 

@@ -76,6 +76,14 @@ over re-scanning the codebase. For depth see `Design.md`, `PRD.md`,
      tested in `tests/test_wizard.py`): count the turn, compare `>=` the cap,
      advance or complete; `NULL`/`0`/negative cap means **unlimited**. The
      advance happens **after** the agent replies.
+   - Three ways a step ends: the cap, the user's **Finish step**
+     (`apply_advance` / `POST /wizard-runs/{id}/advance`, no agent call), or the
+     user accepting the agent's suggestion. The agent suggests by appending
+     `[[STEP_COMPLETE]]`; `extract_completion_signal` strips it before persist
+     **and** display and returns `step_complete_suggested`. It never
+     auto-advances. An uncapped step is only escapable via Finish step.
+   - Wizard admin is a **tab inside AdminPage**, not a route
+     (`WizardAdminPanel.jsx`). The stepper is `position: sticky`.
    - `screen_message(msg, scope_check=False)` skips only the academic-scope
      classifier (jailbreak rules always run) — driven by
      `Wizard.enforce_scope_guardrail`.

@@ -94,6 +94,82 @@ def test_apply_turn_uncapped_last_step_never_completes(cap):
 
 
 # --------------------------------------------------------------------------- #
+# apply_advance — the explicit "Finish step" action
+# --------------------------------------------------------------------------- #
+def test_apply_advance_moves_to_the_next_step_and_resets_the_counter():
+    out = svc.apply_advance(next_step_id="s2")
+    assert out.advanced is True
+    assert out.completed is False
+    assert out.new_current_step_id == "s2"
+    assert out.step_message_count == 0
+    assert out.status == STATUS_ACTIVE
+
+
+def test_apply_advance_on_the_last_step_completes_the_run():
+    out = svc.apply_advance(next_step_id=None)
+    assert out.completed is True
+    assert out.advanced is False
+    assert out.status == STATUS_COMPLETED
+
+
+def test_apply_advance_ignores_the_message_cap():
+    # The whole point: an uncapped step is finishable, and a capped step can be
+    # left early without spending its remaining turns.
+    assert svc.apply_advance(next_step_id="s2").advanced is True
+
+
+# --------------------------------------------------------------------------- #
+# extract_completion_signal — the agent's "this step is done" marker
+# --------------------------------------------------------------------------- #
+def test_completion_signal_absent_leaves_text_untouched():
+    text = "Here is your PICO question.\n\nWhat would you like to refine?"
+    assert svc.extract_completion_signal(text) == (text, False)
+
+
+def test_completion_signal_is_detected_and_stripped():
+    clean, done = svc.extract_completion_signal(
+        "Your question looks solid now.\n\n[[STEP_COMPLETE]]"
+    )
+    assert done is True
+    assert clean == "Your question looks solid now."
+    assert "STEP_COMPLETE" not in clean
+
+
+@pytest.mark.parametrize(
+    "marker",
+    [
+        "[[STEP_COMPLETE]]",
+        "[STEP_COMPLETE]",
+        "[[step_complete]]",
+        "[[ STEP_COMPLETE ]]",
+        "[[STEP COMPLETE]]",
+        "[[STEP-COMPLETE]]",
+        "**[[STEP_COMPLETE]]**",
+        "`[[STEP_COMPLETE]]`",
+    ],
+)
+def test_completion_signal_tolerates_the_shapes_models_emit(marker):
+    clean, done = svc.extract_completion_signal(f"All done here.\n\n{marker}")
+    assert done is True
+    assert clean == "All done here."
+
+
+def test_completion_signal_stripped_mid_text_without_leaving_holes():
+    clean, done = svc.extract_completion_signal(
+        "First line.\n\n[[STEP_COMPLETE]]\n\nSecond line."
+    )
+    assert done is True
+    assert "STEP_COMPLETE" not in clean
+    # No run of blank lines left behind where the marker was.
+    assert "\n\n\n" not in clean
+
+
+def test_completion_signal_handles_empty_input():
+    assert svc.extract_completion_signal("") == ("", False)
+    assert svc.extract_completion_signal(None) == ("", False)
+
+
+# --------------------------------------------------------------------------- #
 # messages_left
 # --------------------------------------------------------------------------- #
 def test_messages_left():
@@ -275,3 +351,18 @@ def test_guidance_omits_the_countdown_when_uncapped():
 def test_guidance_requests_persian_only_for_fa():
     assert "Respond in Persian (Farsi)." in _guidance(lang="fa")
     assert "Persian" not in _guidance(lang="en")
+
+
+def test_guidance_teaches_the_completion_marker():
+    text = _guidance()
+    assert svc.STEP_COMPLETE_MARKER in text
+    # And tells the model to keep it invisible and not to jump ahead.
+    assert "never mention it" in text
+    assert "user's choice" in text
+
+
+def test_guidance_marker_instruction_survives_round_trip():
+    # A reply that follows the instruction must parse back out cleanly.
+    reply = f"Looks good.\n\n{svc.STEP_COMPLETE_MARKER}"
+    clean, done = svc.extract_completion_signal(reply)
+    assert (clean, done) == ("Looks good.", True)

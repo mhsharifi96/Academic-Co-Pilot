@@ -2032,9 +2032,18 @@ html[dir="rtl"] .wz-eyebrow {
 .wz-stepper {
   padding: var(--space-3) var(--space-4);
   border-block-end: 1px solid var(--wz-border);
+  /* Opaque, not translucent: the transcript scrolls underneath it. */
   background: var(--wz-surface);
   display: grid;
   gap: var(--space-2);
+  /* Pinned under the topbar so the step, the progress and the Finish control
+     stay reachable however far the conversation has scrolled. `flex: none`
+     stops the flex column from compressing it as the thread grows. */
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 4;
+  flex: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
 }
 .wz-stepper-head {
   display: flex;
@@ -2479,4 +2488,73 @@ html[dir="rtl"] .msg.assistant {
 .wizard-admin-panel {
   display: grid;
   gap: var(--space-3);
+}
+
+/* ---------- Finishing a step early ---------- */
+.wz-finish-step {
+  min-height: 34px;
+  padding: 5px 12px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+/* Highlighted once the agent reports the step's goal met. */
+.wz-finish-step.suggested {
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-2) 100%);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 0 0 3px var(--wz-glow);
+}
+.wz-finish-step.suggested:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+/* The same offer, inline in the transcript where the user is reading. */
+.wz-suggest {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3);
+  border: 1px solid rgba(91, 140, 255, 0.4);
+  border-radius: 14px;
+  background: rgba(91, 140, 255, 0.08);
+  animation: wz-rise 320ms var(--ease-out) both;
+}
+.wz-suggest > .wz-icon {
+  color: var(--accent);
+  flex: none;
+}
+.wz-suggest-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 12rem;
+}
+.wz-suggest-body span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+.wz-suggest-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wz-suggest {
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .wz-stepper-head {
+    gap: var(--space-2);
+  }
+  .wz-suggest-actions {
+    width: 100%;
+  }
+  .wz-suggest-actions .wz-btn {
+    flex: 1;
+  }
 }

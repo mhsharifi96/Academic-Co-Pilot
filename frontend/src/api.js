@@ -148,6 +148,14 @@ export async function sendWizardMessage(runId, message, lang) {
   });
 }
 
+// Finish the current step now, without spending its remaining messages. Costs
+// nothing — no agent call.
+export async function advanceWizardRun(runId, lang) {
+  return request(`/wizard-runs/${encodeURIComponent(runId)}/advance?${lq(lang)}`, {
+    method: "POST",
+  });
+}
+
 export async function resumeWizardRun(runId, decision, { editedArgs, reason } = {}, lang) {
   return request(`/wizard-runs/${encodeURIComponent(runId)}/resume?${lq(lang)}`, {
     method: "POST",
