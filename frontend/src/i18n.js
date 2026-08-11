@@ -21,7 +21,6 @@ const STRINGS = {
     "nav.wizards": "Wizards",
     "nav.chat": "Chat",
     "nav.myRuns": "My workflows",
-    "nav.adminWizards": "Wizards",
     "nav.backToApp": "Open the app",
     "nav.signIn": "Sign in",
 
@@ -148,7 +147,6 @@ const STRINGS = {
     "nav.wizards": "مسیرها",
     "nav.chat": "گفتگو",
     "nav.myRuns": "مسیرهای من",
-    "nav.adminWizards": "مسیرها",
     "nav.backToApp": "ورود به برنامه",
     "nav.signIn": "ورود",
 

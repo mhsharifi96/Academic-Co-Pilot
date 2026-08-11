@@ -10,7 +10,9 @@
 //   #/runs/:id             a wizard run (requires sign-in)
 //   #/app                  the existing chat application
 //   #/runs                 "my workflows"
-//   #/admin/wizards        the wizard admin panel
+//
+// Wizard administration is NOT a route: it is a tab inside the app's Admin
+// page, reached the same way every other in-app view is.
 
 import { useEffect, useState } from "react";
 
@@ -34,9 +36,6 @@ export function parseRoute(path) {
     return { name: "run", params: { runId: decodeURIComponent(parts[1]) } };
   }
   if (parts[0] === "runs") return { name: "runs", params: {} };
-  if (parts[0] === "admin" && parts[1] === "wizards") {
-    return { name: "adminWizards", params: {} };
-  }
   return { name: "app", params: {} };
 }
 

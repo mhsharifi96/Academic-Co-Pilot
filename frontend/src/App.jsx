@@ -12,7 +12,6 @@ import MessageInput from "./components/MessageInput.jsx";
 import GuidelinesPage from "./components/GuidelinesPage.jsx";
 import AdminPage from "./components/AdminPage.jsx";
 import LoginPage from "./components/LoginPage.jsx";
-import AdminWizardsPage from "./components/AdminWizardsPage.jsx";
 import WizardDetail from "./components/WizardDetail.jsx";
 import WizardLanding from "./components/WizardLanding.jsx";
 import WizardRunner from "./components/WizardRunner.jsx";
@@ -458,9 +457,6 @@ export default function App() {
   if (user) {
     if (route.name === "run") return <WizardRunner runId={route.params.runId} />;
     if (route.name === "runs") return <WizardRunsPage />;
-    if (route.name === "adminWizards") {
-      return user.is_admin ? <AdminWizardsPage /> : <WizardRunsPage />;
-    }
   }
 
   return <ChatApp user={user} setUser={setUser} />;

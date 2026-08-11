@@ -58,11 +58,6 @@ export default function SessionBar({
             Admin
           </button>
         )}
-        {user?.is_admin && (
-          <button className="nav-link" onClick={() => navigate("/admin/wizards")}>
-            Admin · {t("nav.adminWizards")}
-          </button>
-        )}
       </nav>
 
       <div className="session-meta">
