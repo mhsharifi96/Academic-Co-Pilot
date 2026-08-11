@@ -11,6 +11,7 @@ Academic Co-Pilot ("PaperAgent") — an agentic RAG backend (FastAPI) plus a Rea
 Several `.md` files at the repo root cover the same system from different angles — read the one that fits the task instead of re-scanning the tree, and **keep them in sync when behavior changes**:
 
 - `memory.md` — quick high-signal facts + gotchas; read this first.
+- `feature.md` — full catalogue of every user-facing capability, grouped by area (agents, guardrails, literature search, ingestion, downloads, screening, drafting, analytics, billing/admin, API surface).
 - `PRD.md` — product requirements: what/why, features (F1–F12), user flows, non-goals.
 - `Design.md` — technical design: tech stack, architecture diagram, the 9 key design decisions, known limitations.
 - `project_structure.md` — repository map ("where things live") + where to make common changes.

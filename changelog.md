@@ -7,6 +7,13 @@ All notable changes to this project. Format loosely follows
 Work in progress on the current branch (`main`) — not yet committed. Adds the
 authentication and persistence layer on top of the original agent MVP:
 ### Added
+- **`feature.md` — complete feature catalogue.** A single document listing every
+  user-facing capability grouped by area (the two agents and session binding,
+  guardrails and HITL, literature discovery across Scopus/arXiv/Crossref/OpenAlex,
+  ingestion and RAG, the provider PDF download queue, screening, the drafting and
+  export pipeline, quality tooling, analytics and infographics, auth/billing/admin,
+  the frontend, the full API surface, platform features, and known limitations).
+  Linked from the companion-docs list in `CLAUDE.md`.
 - **Provider PDF download queue (DOI → PDF → ingest → attach).** Users can now
   pull a paper's full text from the external provider. The frontend detects DOIs
   in assistant messages and shows a `📄 Get PDF` chip → a confirmation modal
