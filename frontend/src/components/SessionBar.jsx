@@ -1,3 +1,7 @@
+import { navigate } from "../router.js";
+import { useT } from "../i18n.js";
+import LangToggle from "./LangToggle.jsx";
+
 export default function SessionBar({
   sessionId,
   onNewSession,
@@ -6,6 +10,7 @@ export default function SessionBar({
   user,
   onLogout,
 }) {
+  const { t } = useT();
   const shortId = sessionId
     ? sessionId.length > 14
       ? `${sessionId.slice(0, 8)}…${sessionId.slice(-4)}`
@@ -38,6 +43,13 @@ export default function SessionBar({
         >
           Downloads
         </button>
+        {/* These two leave the chat view entirely — they are hash routes. */}
+        <button className="nav-link" onClick={() => onNavigate("wizards")}>
+          {t("nav.wizards")}
+        </button>
+        <button className="nav-link" onClick={() => navigate("/runs")}>
+          {t("nav.myRuns")}
+        </button>
         {user?.is_admin && (
           <button
             className={`nav-link${view === "admin" ? " active" : ""}`}
@@ -46,9 +58,15 @@ export default function SessionBar({
             Admin
           </button>
         )}
+        {user?.is_admin && (
+          <button className="nav-link" onClick={() => navigate("/admin/wizards")}>
+            Admin · {t("nav.adminWizards")}
+          </button>
+        )}
       </nav>
 
       <div className="session-meta">
+        <LangToggle compact />
         <span
           className="session-id"
           title={sessionId || "A session starts on your first message or upload"}

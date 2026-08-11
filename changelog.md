@@ -7,6 +7,60 @@ All notable changes to this project. Format loosely follows
 Work in progress on the current branch (`main`) — not yet committed. Adds the
 authentication and persistence layer on top of the original agent MVP:
 ### Added
+- **Dynamic wizards — admin-authored guided workflows (en/fa).** Admins define a
+  `Wizard` (unique slug, internal `name`, and per-language `title_*` /
+  `short_description_*`) with an ordered list of `WizardStep`s; each step carries
+  a `guideline_prompt` that steers the agent and a `max_messages` cap. A user
+  picks one from a **public** landing page (`#/`, no token required), signs in,
+  and runs it as a guided chat: the current step's prompt is injected every turn
+  through the per-turn context channel, and using up the step's cap advances the
+  run automatically — exhausting the last step's cap completes it. The transcript
+  is persisted as real rows (`wizard_messages`), not just checkpointer state, so
+  a run can be left and continued.
+  - New models (`app/models/wizard.py`): `Wizard`, `WizardStep`, `WizardRun`,
+    `WizardMessage`; DDL parity file `migrations/20260811_add_wizard.sql`.
+  - The step state machine and localisation helpers are pure functions in
+    `app/services/wizard_service.py` (`apply_turn`, `next_step_id`,
+    `reordered_positions`, `resolve_locale`, `localized`, `slugify`,
+    `build_step_guidance`), unit-tested offline in `tests/test_wizard.py`.
+    `apply_turn` compares with `>=` so a cap an admin lowers mid-step still
+    terminates, and treats a `NULL`/`0`/negative cap as *unlimited*.
+  - API (`app/api/v1/endpoints/wizard.py`): public `GET /wizards`,
+    `GET /wizards/{slug}`; authenticated `POST /wizard-runs` (start **or**
+    resume, returning the transcript in one call), `GET /wizard-runs`,
+    `GET /wizard-runs/{id}`, `POST /wizard-runs/{id}/messages`,
+    `POST /wizard-runs/{id}/resume`, `DELETE /wizard-runs/{id}`; admin CRUD under
+    `/admin/wizards` and `/admin/wizard-steps` including a reorder route.
+    Language is chosen per request with `?lang=en|fa`; public routes return text
+    already resolved for that language and never expose `guideline_prompt`.
+    Admin write schemas also accept the original field spellings
+    (`gaurdline_prompt`, `max_masseage`) as aliases.
+  - Runs execute on the existing shared `AcademicAgent` — no third graph. Each
+    run is backed by a real `ChatSession` (`agent_type="wizard"`) whose id is the
+    LangGraph `thread_id`, so uploads and the history/plan endpoints work
+    unchanged. Three guards keep the counter honest: `POST /chat` and
+    `DELETE /sessions/{id}` return 409 for a wizard thread, and wizard sessions
+    are excluded from the chat sidebar.
+  - `screen_message` gained `scope_check: bool = True`
+    (`app/agents/guardrails.py`). A wizard can opt out of the *academic scope*
+    classifier via `Wizard.enforce_scope_guardrail` while the deterministic
+    jailbreak rules always run. A blocked turn persists nothing and does not
+    burn a step allowance.
+  - `chat.py`'s `_build_context_message` / `_final_text` moved to
+    `app/agents/context.py` (`build_session_context`, `final_text`) and are now
+    shared by both endpoints.
+  - Frontend: a public bilingual landing page plus the run/continue UI —
+    `WizardLanding`, `WizardCard`, `WizardDetail`, `WizardRunner`,
+    `WizardStepper`, `WizardRunsPage`, `AdminWizardsPage`, `WizardEditor`,
+    `LangToggle`, `WizardIcon`. Two new dependency-free modules back them:
+    `frontend/src/i18n.js` (en/fa dictionary, `LangProvider`, `useT`, keeps
+    `<html lang|dir>` in sync) and `frontend/src/router.js` (a small hash router
+    — `#/`, `#/wizards/:slug`, `#/runs/:id`, `#/runs`, `#/admin/wizards`, `#/app`
+    — mounted above the app's auth gate so the landing page is reachable while
+    signed out). Styling adds Crimson Pro / Atkinson Hyperlegible / Vazirmatn,
+    an additive token block, SVG icons instead of emoji, staggered reveals that
+    respect `prefers-reduced-motion`, and an `html[dir="rtl"]` patch block for
+    the older physically-positioned chat chrome.
 - **`feature.md` — complete feature catalogue.** A single document listing every
   user-facing capability grouped by area (the two agents and session binding,
   guardrails and HITL, literature discovery across Scopus/arXiv/Crossref/OpenAlex,

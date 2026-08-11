@@ -335,6 +335,17 @@ UI: `AdminPage.jsx`.
 - **Interrupt card** — Approve / Edit (editable JSON args) / Reject with reason.
 - **Downloads tab + DOI chips + status cards** — queue a PDF by DOI, watch job
   status, and recover from failures (upload manually or continue without).
+- **Wizard landing page** — a **public**, bilingual (en/fa, RTL-aware) catalogue of
+  guided workflows at `#/`, reachable without signing in; picking one leads to a
+  detail page with the step outline, then to the runner.
+- **Wizard runner** — the guided chat: a stepper showing "Step 2 of 5", a progress
+  bar, the current step's name, and how many messages remain before the workflow
+  moves on; a completion panel when the last step is done.
+- **My workflows** — in-progress and finished runs, with Continue.
+- **Language toggle (EN / فا)** — switches UI strings, the language the wizard API
+  resolves content for, and `<html dir>`.
+- **Wizard admin** — create/publish/delete workflows and edit their steps
+  (bilingual fields side by side, guideline prompt, message cap, reordering).
 - **Guidelines page** — in-app usage guidance.
 - **Admin page** — user/balance management for admins.
 - **Balance indicator** in the top bar.
@@ -367,6 +378,19 @@ UI: `AdminPage.jsx`.
 | `GET /api/v1/admin/users` | *(admin)* List users |
 | `PATCH /api/v1/admin/users/{id}` | *(admin)* Set balance / admin flag |
 | `POST /api/v1/admin/users/{id}/adjust-balance` | *(admin)* Add or subtract credit |
+| `GET /api/v1/wizards?lang=` | **Public** — published wizards, resolved for `en`/`fa` |
+| `GET /api/v1/wizards/{slug}?lang=` | **Public** — one wizard + its step outline |
+| `POST /api/v1/wizard-runs` | Start a wizard, or resume your active run (returns the transcript) |
+| `GET /api/v1/wizard-runs?status=` | Your runs, most recently active first |
+| `GET /api/v1/wizard-runs/{id}` | One run + its persisted transcript |
+| `POST /api/v1/wizard-runs/{id}/messages` | Take a turn (advances the step when the cap is used up) |
+| `POST /api/v1/wizard-runs/{id}/resume` | Approve / edit / reject a paused tool call in a run |
+| `DELETE /api/v1/wizard-runs/{id}` | Abandon a run (transcript kept, thread + files cleared) |
+| `GET|POST /api/v1/admin/wizards` | *(admin)* List all wizards / create one |
+| `GET|PATCH|DELETE /api/v1/admin/wizards/{id}` | *(admin)* Read / edit / delete (409 once runs exist) |
+| `POST /api/v1/admin/wizards/{id}/steps` | *(admin)* Append a step |
+| `PATCH|DELETE /api/v1/admin/wizard-steps/{id}` | *(admin)* Edit / delete a step |
+| `PUT /api/v1/admin/wizards/{id}/steps/reorder` | *(admin)* Rewrite step order |
 
 Interactive docs at `http://localhost:8000/docs`.
 

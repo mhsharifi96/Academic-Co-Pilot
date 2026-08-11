@@ -143,10 +143,16 @@ def _parse_verdict(raw: str) -> GuardVerdict:
     )
 
 
-async def screen_message(message: str) -> GuardVerdict:
+async def screen_message(message: str, *, scope_check: bool = True) -> GuardVerdict:
     """
     Screen a user message. Returns a :class:`GuardVerdict`; callers should
     refuse to run the agent when ``allowed`` is False.
+
+    ``scope_check=False`` keeps the deterministic jailbreak/prompt-injection
+    rules but skips the *academic scope* classifier. Wizards use this: an
+    admin-authored workflow may legitimately sit outside the classifier's
+    hard-coded academic scope, and prompt injection is orthogonal to domain so
+    the rule layer always runs.
 
     Fails open on any classifier error so a transient LLM/network problem can't
     take down chat.
@@ -161,6 +167,9 @@ async def screen_message(message: str) -> GuardVerdict:
     ruled = _rule_check(message)
     if ruled is not None:
         return ruled
+
+    if not scope_check:
+        return GuardVerdict(allowed=True)
 
     download_request = _download_doi_check(message)
     if download_request is not None:

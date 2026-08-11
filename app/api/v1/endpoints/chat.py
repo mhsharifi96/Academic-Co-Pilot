@@ -1,10 +1,10 @@
 import uuid
 from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
-from langchain_core.messages import AIMessage
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.chat import ChatRequest, ChatResponse, ResumeRequest
+from app.agents.context import build_session_context, final_text
 from app.agents.hitl import extract_interrupt, build_resume_command_value
 from app.agents.guardrails import screen_message, REFUSAL_MESSAGE
 from app.core.config import settings
@@ -12,9 +12,9 @@ from app.core.sessions import session_manager
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.auth import User
+from app.models.wizard import WIZARD_AGENT_TYPE
 from app.services.billing_service import charge_usage, has_sufficient_balance
 from app.services.session_service import ensure_session, get_owned_session
-from app.tools.task_planner import render_plan
 
 router = APIRouter()
 
@@ -28,31 +28,22 @@ def _get_agent(request: Request, agent_type: str = "academic"):
     return agent
 
 
-def _final_text(result: Dict[str, Any]) -> str:
-    """Extract the last AI message text from a graph result."""
-    messages = result.get("messages", []) if isinstance(result, dict) else []
-    for msg in reversed(messages):
-        if isinstance(msg, AIMessage) and msg.content:
-            return msg.content if isinstance(msg.content, str) else str(msg.content)
-    return ""
+def _reject_wizard_session(agent_type: str) -> None:
+    """
+    Wizard threads may only be advanced through the wizard endpoints.
 
-
-async def _build_context_message(session_id: str) -> Optional[str]:
-    """Build the per-turn system context: session id, files, and current plan."""
-    parts = [f"Current session_id: {session_id}"]
-
-    files = await session_manager.get_files(session_id)
-    if not files:
-        parts.append("Session files: (none uploaded yet — the user can upload PDFs/CSVs).")
-    else:
-        listed = "\n".join(f"  - {f}" for f in files)
-        parts.append(f"Files available in this session:\n{listed}")
-
-    plan = await session_manager.get_plan(session_id)
-    if plan:
-        parts.append("Current task plan (update it with `update_plan` as you progress):\n" + render_plan(plan))
-
-    return "\n\n".join(parts)
+    Otherwise a client could post here with a run's ``session_id`` and take
+    unlimited free-form turns on the same thread while the step counter never
+    moves and nothing lands in ``wizard_messages``.
+    """
+    if agent_type == WIZARD_AGENT_TYPE:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "This conversation belongs to a wizard run; post to "
+                "/api/v1/wizard-runs/{run_id}/messages instead."
+            ),
+        )
 
 
 async def _to_response(
@@ -74,7 +65,7 @@ async def _to_response(
     # Completed normally — clear any stale interrupt marker.
     await session_manager.set_pending_interrupt(session_id, None)
     return ChatResponse(
-        response=_final_text(result),
+        response=final_text(result),
         session_id=session_id,
         status="complete",
         output=None,
@@ -115,6 +106,8 @@ async def chat(
     except PermissionError:
         raise HTTPException(status_code=404, detail="Session not found.")
 
+    _reject_wizard_session(cs.agent_type)
+
     # Always honour the session's bound agent, ignoring any mismatching request.
     agent = _get_agent(http_request, cs.agent_type)
 
@@ -142,7 +135,7 @@ async def chat(
     await session_manager.get_or_create(session_id)
 
     try:
-        context_message = await _build_context_message(session_id)
+        context_message = await build_session_context(session_id)
         result, usage = await agent.run(
             request.message,
             session_id=session_id,
@@ -175,6 +168,7 @@ async def resume(
     owned = await get_owned_session(db, current_user, request.session_id)
     if owned is None:
         raise HTTPException(status_code=404, detail="Session not found.")
+    _reject_wizard_session(owned.agent_type)
     # Resume on the session's bound agent (deep sessions never interrupt, but
     # this keeps the selection correct regardless).
     agent = _get_agent(http_request, owned.agent_type)

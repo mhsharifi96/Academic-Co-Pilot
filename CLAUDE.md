@@ -64,6 +64,33 @@ All three use the same Postgres instance but are deliberately distinct subsystem
 2. **Vector store** (`app/core/db.py`) — `PGVector` with OpenAI embeddings, collection `academic_papers`. Sync **psycopg2**.
 3. **Conversation checkpointer** (`app/core/checkpointer.py`) — LangGraph `AsyncPostgresSaver` keyed by `thread_id == session_id`. Falls back to `InMemorySaver` when `DATABASE_URL` is unset. **Chat messages live here, NOT in the app tables.**
 
+### Wizards (guided workflows)
+Admin-authored, ordered multi-step flows a user runs as a guided chat
+(`app/models/wizard.py`, `app/services/wizard_service.py`,
+`app/api/v1/endpoints/wizard.py`). Four things are easy to get wrong:
+
+1. **Wizard transcripts live in the app tables** (`wizard_messages`), not the
+   checkpointer — the one exception to the rule above. The checkpointer still
+   owns the graph state for the same thread.
+2. **There is no wizard agent.** Runs execute on the existing `app.state.agent`;
+   the current step's `guideline_prompt` arrives through the per-turn
+   `context_message` (see below), which is why it survives summarization and can
+   change per step. Do not add a third graph.
+3. **A run is backed by a `ChatSession` with `agent_type="wizard"`** — a third
+   value alongside `"academic"`/`"deep"` — whose id is `WizardRun.session_id` and
+   the LangGraph `thread_id`, so uploads and `/sessions/{id}/files|history|plan`
+   work unchanged. Three guards keep the step counter honest: `POST /chat` and
+   `DELETE /sessions/{id}` return **409** for a wizard thread, and wizard
+   sessions are excluded from `list_user_sessions`.
+4. **The step advance happens after the agent replies**, in `record_turn`, so the
+   Nth message is answered under the step it was sent on. The rule itself is the
+   pure `apply_turn` (`>=` the cap; `NULL`/`0`/negative means unlimited),
+   unit-tested in `tests/test_wizard.py` — change it there, not in the endpoint.
+
+Locale is a per-request `?lang=en|fa`: public/user routes return text already
+resolved for that language and never expose `guideline_prompt`; admin routes
+return the raw `*_en`/`*_fa` columns.
+
 ### Two distinct "session" concepts
 - `ChatSession` (DB row, `app/models/auth.py`) — ownership, title, timestamps. Its `id` *is* the `session_id` *is* the LangGraph `thread_id`. Managed via `app/services/session_service.py` (`ensure_session`, `get_owned_session`, ...).
 - `SessionManager` (in-memory singleton, `app/core/sessions.py`) — tracks **uploaded file paths** and the **pending HITL interrupt** per session. Not persisted. `sync_get_files` exists so `@tool` functions (which run synchronously inside the graph) can read files without deadlocking the asyncio lock.
@@ -75,8 +102,13 @@ HITL is **off by default** (`REQUIRE_TOOL_APPROVAL=false` in `app/core/config.py
 
 When adding a tool that executes code or mutates persistent state, add its name to `INTERRUPT_TOOLS`.
 
-### Per-turn file context
-The chat endpoint injects the session's current file list as a `SystemMessage` *each turn* (`_build_context_message` → `BaseAgent.run(context_message=...)`) rather than baking it into the static system prompt, because the file set changes between requests.
+### Per-turn context
+Request-scoped facts reach the model as a `SystemMessage` injected *each turn*
+(`app/agents/context.py::build_session_context` → `BaseAgent.run(context_message=...)`)
+rather than being baked into the static system prompt, because the file set
+changes between requests. It is filtered out of the `/history` projection, so it
+never appears in a transcript. Wizard turns prepend their step framing to the
+same string. `final_text` (last AI message of a graph result) lives here too.
 
 ### Auth
 JWT bearer (`app/core/security.py`): `get_current_user` protects endpoints; bcrypt for passwords (truncated to 72 bytes deliberately). `app/api/v1/endpoints/auth.py` exposes register/login. Every chat/session request verifies the user **owns** the session (cross-user access → 404).

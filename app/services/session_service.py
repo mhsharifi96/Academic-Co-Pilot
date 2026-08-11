@@ -13,6 +13,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.auth import ChatSession, User
+from app.models.wizard import WIZARD_AGENT_TYPE
+
+# Agents a session may be bound to. "wizard" sessions back a WizardRun: they are
+# created by app/services/wizard_service.py, hidden from the chat sidebar, and
+# only advanced through the wizard endpoints.
+AGENT_TYPES = ("academic", "deep", WIZARD_AGENT_TYPE)
 
 
 async def get_owned_session(
@@ -26,10 +32,18 @@ async def get_owned_session(
 
 
 async def list_user_sessions(db: AsyncSession, user: User) -> List[ChatSession]:
-    """All of the user's sessions, newest-updated first."""
+    """
+    The user's chat sessions, newest-updated first.
+
+    Wizard-run sessions are excluded — they are listed by ``GET /wizard-runs``
+    and would otherwise show up twice, as an untitled chat and as a run.
+    """
     result = await db.execute(
         select(ChatSession)
-        .where(ChatSession.user_id == user.id)
+        .where(
+            ChatSession.user_id == user.id,
+            ChatSession.agent_type != WIZARD_AGENT_TYPE,
+        )
         .order_by(ChatSession.updated_at.desc())
     )
     return list(result.scalars().all())
@@ -46,8 +60,9 @@ async def ensure_session(
     Create the session row if missing (owned by ``user``), otherwise touch it.
     If a row with this id exists but belongs to someone else, raise PermissionError.
 
-    ``agent_type`` ("academic" | "deep") is recorded only when the row is first
-    created — the binding is immutable, so it is ignored for existing sessions.
+    ``agent_type`` (one of ``AGENT_TYPES``) is recorded only when the row is
+    first created — the binding is immutable, so it is ignored for existing
+    sessions. Anything unrecognised falls back to "academic".
     """
     cs = await db.get(ChatSession, session_id)
     if cs is None:
@@ -55,7 +70,7 @@ async def ensure_session(
             id=session_id,
             user_id=user.id,
             title=(title or "New chat")[:120],
-            agent_type=agent_type if agent_type in ("academic", "deep") else "academic",
+            agent_type=agent_type if agent_type in AGENT_TYPES else "academic",
         )
         db.add(cs)
     elif cs.user_id != user.id:

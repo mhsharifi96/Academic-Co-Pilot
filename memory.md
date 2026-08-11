@@ -58,6 +58,33 @@ over re-scanning the codebase. For depth see `Design.md`, `PRD.md`,
    - FAST (requests 1–3, ~1h) vs STANDARD (4–10, spread over 24h + per-user
      jitter). Quota/scheduling/fairness/retry are **pure functions** in
      `app/services/download_service.py` (tested in `tests/test_downloads.py`).
+7d. **Dynamic wizards** (admin-authored guided workflows, en/fa):
+   - 4 tables in `app/models/wizard.py`: `Wizard` (slug + per-language
+     `title_*`/`short_description_*`), `WizardStep` (`guideline_prompt`,
+     `max_messages`, `position`), `WizardRun`, `WizardMessage`.
+   - ⚠️ **Wizard transcripts ARE in the app tables** (`wizard_messages`) — the
+     one exception to gotcha #1. The checkpointer still holds the graph state.
+   - A run is backed by a `ChatSession` with **`agent_type="wizard"`** (a third
+     value, see gotcha #3); `WizardRun.session_id` is that id and the
+     `thread_id`. Runs execute on the **existing** `app.state.agent` — there is
+     no wizard agent class. The step's prompt arrives via the per-turn
+     `context_message`, so it survives summarization and can be swapped per step.
+   - Guards: `POST /chat` and `DELETE /sessions/{id}` **409** on a wizard thread;
+     wizard sessions are filtered out of `list_user_sessions`. Break these and
+     the step counter silently stops advancing.
+   - Step advance is `apply_turn` in `app/services/wizard_service.py` (pure,
+     tested in `tests/test_wizard.py`): count the turn, compare `>=` the cap,
+     advance or complete; `NULL`/`0`/negative cap means **unlimited**. The
+     advance happens **after** the agent replies.
+   - `screen_message(msg, scope_check=False)` skips only the academic-scope
+     classifier (jailbreak rules always run) — driven by
+     `Wizard.enforce_scope_guardrail`.
+   - Locale is `?lang=en|fa`; public routes resolve one language and never expose
+     `guideline_prompt`. Admin write schemas also accept the original spellings
+     `gaurdline_prompt` / `max_masseage` as aliases.
+   - Frontend: hash router (`frontend/src/router.js`) mounted **above** the auth
+     gate so `#/` is public; `frontend/src/i18n.js` holds the en/fa dictionary
+     and drives `<html lang|dir>`. New CSS uses logical properties for RTL.
    - On success the PDF goes through the **same ingestion path** as `/upload`
      (`ingest_pdf` + `session_manager.add_files`) → becomes conversation context.
 8. **LLM/image calls have a central seam** — `app/repositories/llm.py`

@@ -1482,3 +1482,964 @@ button.ghost {
     grid-template-columns: 1fr;
   }
 }
+
+/* =========================================================================
+   Wizards — guided workflows
+   =========================================================================
+   Additive: every token below is new, so nothing in the chat UI shifts.
+   The palette stays the app's dark ground; the wizard surface adds depth
+   (layered panels, an ambient aura, a serif display face) rather than a
+   second theme.
+
+   These rules use LOGICAL properties (margin-inline, inset-inline, text-align
+   start/end) throughout, so the whole wizard surface mirrors correctly under
+   <html dir="rtl"> with no per-rule overrides. The RTL block at the very
+   bottom only patches the older, physically-positioned chat chrome.
+   ---------------------------------------------------------------------- */
+:root {
+  --font-display: "Crimson Pro", Georgia, "Times New Roman", serif;
+  --font-fa: "Vazirmatn", var(--font);
+
+  --wz-surface: #141824;
+  --wz-surface-2: #1a2030;
+  --wz-border: #262d3f;
+  --wz-border-strong: #38425c;
+  --wz-navy: #1e3a5f;
+  --wz-glow: rgba(91, 140, 255, 0.16);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 40px;
+  --space-6: 64px;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Persian gets its own face; one token swap covers the whole app. */
+html[dir="rtl"] {
+  --font: var(--font-fa);
+  --font-display: var(--font-fa);
+}
+
+/* ---------- Page shells ---------- */
+.wz-landing,
+.wz-runner {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  overflow-y: auto;
+  background:
+    radial-gradient(80rem 40rem at 50% -10rem, var(--wz-glow), transparent 70%),
+    var(--bg);
+}
+.wz-runner {
+  overflow: hidden; /* the thread scrolls, not the page */
+}
+
+.wz-topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-block-end: 1px solid var(--wz-border);
+  background: rgba(15, 17, 23, 0.72);
+  backdrop-filter: blur(10px);
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 5;
+}
+.wz-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.wz-brand .wz-icon {
+  color: var(--accent);
+}
+.wz-topbar-actions {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ---------- Buttons ---------- */
+.wz-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1px solid var(--wz-border-strong);
+  background: var(--wz-surface-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 180ms var(--ease-out), border-color 180ms var(--ease-out),
+    transform 180ms var(--ease-out);
+}
+.wz-btn:hover:not(:disabled) {
+  background: #222a3c;
+  border-color: var(--accent);
+}
+.wz-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.wz-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.wz-btn.primary {
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-2) 100%);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 6px 20px rgba(63, 111, 224, 0.28);
+}
+.wz-btn.primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.wz-btn.ghost {
+  background: transparent;
+}
+.wz-btn.danger {
+  color: var(--red);
+  border-color: rgba(255, 92, 108, 0.35);
+  background: transparent;
+}
+.wz-btn.danger:hover:not(:disabled) {
+  background: rgba(255, 92, 108, 0.1);
+  border-color: var(--red);
+}
+.wz-btn.small {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+.wz-btn.large {
+  min-height: 52px;
+  padding: 14px 26px;
+  font-size: 1rem;
+}
+.wz-btn.icon {
+  min-height: 32px;
+  min-width: 32px;
+  padding: 0;
+}
+/* The arrow points along the reading direction. */
+.wz-go-arrow,
+.wz-back-arrow {
+  transition: transform 180ms var(--ease-out);
+}
+html[dir="rtl"] .wz-go-arrow,
+.wz-back-arrow {
+  transform: scaleX(-1);
+}
+html[dir="rtl"] .wz-back-arrow {
+  transform: none;
+}
+.wz-btn:hover .wz-go-arrow {
+  transform: translateX(3px);
+}
+html[dir="rtl"] .wz-btn:hover .wz-go-arrow {
+  transform: scaleX(-1) translateX(3px);
+}
+
+.wz-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  padding: 8px;
+}
+.wz-back:hover {
+  color: var(--text);
+}
+
+/* ---------- Language toggle ---------- */
+.lang-toggle {
+  display: inline-flex;
+  border: 1px solid var(--wz-border-strong);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--wz-surface);
+}
+.lang-option {
+  min-height: 32px;
+  padding: 4px 12px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 160ms var(--ease-out), color 160ms var(--ease-out);
+}
+.lang-option:hover {
+  color: var(--text);
+}
+.lang-option.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ---------- Hero ---------- */
+.wz-hero {
+  position: relative;
+  padding: var(--space-6) var(--space-4) var(--space-5);
+  text-align: center;
+  max-width: 62rem;
+  margin-inline: auto;
+}
+.wz-hero-aura {
+  position: absolute;
+  inset-block-start: -8rem;
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  width: min(46rem, 90vw);
+  height: 26rem;
+  background: radial-gradient(closest-side, var(--wz-glow), transparent);
+  pointer-events: none;
+  filter: blur(12px);
+}
+.wz-eyebrow {
+  margin: 0 0 var(--space-3);
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+html[dir="rtl"] .wz-eyebrow {
+  letter-spacing: normal;
+  text-transform: none;
+}
+.wz-hero-title {
+  position: relative;
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+.wz-hero-sub {
+  position: relative;
+  margin: 0 auto var(--space-4);
+  max-width: 44rem;
+  color: var(--muted);
+  font-size: clamp(0.95rem, 1.6vw, 1.1rem);
+}
+.wz-hero-actions {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: center;
+}
+
+/* ---------- Sections ---------- */
+.wz-section {
+  width: 100%;
+  max-width: 72rem;
+  margin-inline: auto;
+  padding: var(--space-5) var(--space-4);
+}
+.wz-section-title {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 2.6vw, 1.9rem);
+  font-weight: 600;
+}
+.wz-section-title.small {
+  font-size: 1.1rem;
+  margin-block-start: var(--space-4);
+}
+.wz-section-sub {
+  margin: 0 0 var(--space-4);
+  color: var(--muted);
+  max-width: 46rem;
+}
+.wz-muted {
+  color: var(--muted);
+}
+.wz-empty {
+  border: 1px dashed var(--wz-border-strong);
+  border-radius: var(--radius);
+  padding: var(--space-5);
+  text-align: center;
+  display: grid;
+  gap: var(--space-2);
+  justify-items: center;
+}
+
+/* ---------- Wizard cards ---------- */
+.wz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: var(--space-3);
+}
+.wz-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  min-height: 12rem;
+  text-align: start;
+  border: 1px solid var(--wz-border);
+  border-radius: 16px;
+  background: linear-gradient(160deg, var(--wz-surface-2), var(--wz-surface));
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 220ms var(--ease-out), border-color 220ms var(--ease-out),
+    box-shadow 220ms var(--ease-out);
+  animation: wz-rise 420ms var(--ease-out) both;
+  animation-delay: var(--wz-stagger, 0ms);
+}
+.wz-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--wz-border-strong);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
+}
+.wz-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.wz-card-glow {
+  position: absolute;
+  inset-block-start: -40%;
+  inset-inline-end: -30%;
+  width: 16rem;
+  height: 16rem;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--wz-glow), transparent);
+  opacity: 0;
+  transition: opacity 260ms var(--ease-out);
+  pointer-events: none;
+}
+.wz-card:hover .wz-card-glow {
+  opacity: 1;
+}
+.wz-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: rgba(91, 140, 255, 0.12);
+  border: 1px solid rgba(91, 140, 255, 0.28);
+  color: var(--accent);
+  flex: none;
+}
+.wz-card-icon.large {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+}
+.wz-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1;
+}
+.wz-card-title {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.wz-card-desc {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.wz-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-block-start: var(--space-2);
+  border-block-start: 1px solid var(--wz-border);
+}
+.wz-card-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* ---------- Chips ---------- */
+.wz-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--wz-border-strong);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  margin: 0;
+}
+.wz-chip.subtle {
+  border-color: var(--wz-border);
+}
+.wz-chip.warn {
+  color: var(--amber);
+  border-color: rgba(245, 166, 35, 0.4);
+}
+.wz-chip.done {
+  color: var(--green);
+  border-color: rgba(46, 204, 113, 0.4);
+}
+
+/* ---------- "How it works" ---------- */
+.wz-how-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--space-3);
+}
+.wz-how-item {
+  position: relative;
+  padding: var(--space-4);
+  border: 1px solid var(--wz-border);
+  border-radius: 14px;
+  background: var(--wz-surface);
+}
+.wz-how-item h3 {
+  margin: var(--space-2) 0 var(--space-1);
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}
+.wz-how-item p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.wz-how-num {
+  position: absolute;
+  inset-block-start: var(--space-3);
+  inset-inline-end: var(--space-3);
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  color: var(--wz-border-strong);
+}
+.wz-how-icon {
+  color: var(--accent);
+  display: inline-flex;
+}
+
+.wz-footer {
+  margin-block-start: auto;
+  padding: var(--space-4);
+  border-block-start: 1px solid var(--wz-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* ---------- Wizard detail ---------- */
+.wz-detail {
+  width: 100%;
+  max-width: 52rem;
+  margin-inline: auto;
+  padding: var(--space-5) var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+}
+.wz-detail-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.wz-detail-title {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-weight: 600;
+}
+.wz-detail-desc {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1.02rem;
+  max-width: 44rem;
+}
+.wz-path {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+  width: 100%;
+}
+.wz-path-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 12px var(--space-3);
+  border: 1px solid var(--wz-border);
+  border-radius: 12px;
+  background: var(--wz-surface);
+}
+.wz-path-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 50%;
+  background: rgba(91, 140, 255, 0.14);
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.wz-path-name {
+  flex: 1;
+}
+
+/* ---------- Stepper ---------- */
+.wz-stepper {
+  padding: var(--space-3) var(--space-4);
+  border-block-end: 1px solid var(--wz-border);
+  background: var(--wz-surface);
+  display: grid;
+  gap: var(--space-2);
+}
+.wz-stepper-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.wz-stepper-where {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+.wz-stepper-count {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+html[dir="rtl"] .wz-stepper-count {
+  letter-spacing: normal;
+  text-transform: none;
+}
+.wz-stepper-name {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+.wz-progress {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--wz-border);
+  overflow: hidden;
+}
+.wz-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent-2), var(--accent));
+  transition: width 420ms var(--ease-out);
+}
+html[dir="rtl"] .wz-progress-fill {
+  background: linear-gradient(270deg, var(--accent-2), var(--accent));
+}
+.wz-dots {
+  list-style: none;
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+}
+.wz-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--wz-border-strong);
+}
+.wz-dot.done {
+  background: var(--green);
+}
+.wz-dot.current {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--wz-glow);
+}
+
+/* ---------- Runner ---------- */
+.wz-runner-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.wz-thread {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: 56rem;
+  margin-inline: auto;
+}
+.wz-thread-welcome {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  color: var(--muted);
+  text-align: center;
+}
+.wz-thread-welcome .wz-icon {
+  color: var(--accent);
+}
+.wz-notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: center;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(46, 204, 113, 0.35);
+  background: rgba(46, 204, 113, 0.08);
+  color: var(--green);
+  font-size: 0.85rem;
+  animation: wz-rise 320ms var(--ease-out) both;
+}
+.wz-complete {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border: 1px solid rgba(46, 204, 113, 0.3);
+  border-radius: 16px;
+  background: rgba(46, 204, 113, 0.05);
+  text-align: center;
+}
+.wz-complete .wz-icon {
+  color: var(--green);
+}
+.wz-complete h2 {
+  margin: 0;
+  font-family: var(--font-display);
+}
+.wz-complete p {
+  margin: 0;
+  color: var(--muted);
+}
+.wz-composer {
+  width: 100%;
+  max-width: 56rem;
+  margin-inline: auto;
+}
+
+/* ---------- Runs list ---------- */
+.wz-run-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.wz-run-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: 12px var(--space-3);
+  border: 1px solid var(--wz-border);
+  border-radius: 12px;
+  background: var(--wz-surface);
+  transition: border-color 180ms var(--ease-out);
+}
+.wz-run-row:hover {
+  border-color: var(--wz-border-strong);
+}
+.wz-run-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 10px;
+  background: rgba(91, 140, 255, 0.12);
+  color: var(--accent);
+}
+.wz-run-icon.done {
+  background: rgba(46, 204, 113, 0.12);
+  color: var(--green);
+}
+.wz-run-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 12rem;
+}
+.wz-run-title {
+  font-weight: 600;
+}
+.wz-run-meta {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.wz-run-meta code {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+}
+
+/* ---------- Admin editor ---------- */
+.wz-editor {
+  display: grid;
+  gap: var(--space-3);
+}
+.wz-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.wz-editor-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+}
+.wz-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--space-3);
+}
+.wz-field {
+  display: grid;
+  gap: 6px;
+}
+.wz-field-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.wz-field-hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.wz-field input,
+.wz-field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--wz-border-strong);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+.wz-field textarea {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+.wz-field input:focus-visible,
+.wz-field textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+.wz-toggles {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--wz-border);
+  border-radius: 12px;
+  background: var(--wz-surface);
+}
+.wz-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+.wz-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+.wz-icon-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.wz-icon-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--wz-border-strong);
+  background: var(--bg);
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 160ms var(--ease-out), border-color 160ms var(--ease-out);
+}
+.wz-icon-option:hover {
+  color: var(--text);
+}
+.wz-icon-option.selected {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(91, 140, 255, 0.12);
+}
+.wz-step-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.wz-step-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--wz-border);
+  border-radius: 14px;
+  background: var(--wz-surface);
+}
+.wz-step-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.wz-step-order {
+  display: flex;
+  gap: 4px;
+}
+.wz-step-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* ---------- Motion ---------- */
+@keyframes wz-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wz-card,
+  .wz-notice {
+    animation: none;
+  }
+  .wz-card:hover {
+    transform: none;
+  }
+  .wz-btn,
+  .wz-card,
+  .wz-progress-fill,
+  .wz-go-arrow {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .wz-hero {
+    padding-block: var(--space-5) var(--space-4);
+  }
+  .wz-section {
+    padding-inline: var(--space-3);
+  }
+  .wz-grid {
+    grid-template-columns: 1fr;
+  }
+  .wz-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .wz-topbar {
+    flex-wrap: wrap;
+  }
+}
+
+/* =========================================================================
+   RTL patches for the pre-existing chat chrome
+   =========================================================================
+   The wizard surface above is written with logical properties and needs no
+   help. These rules only mirror the older screens, which were built with
+   physical ones (margin-left, right, text-align: left). Scope is deliberately
+   narrow — a full migration of styles.css is a separate change.
+   ---------------------------------------------------------------------- */
+html[dir="rtl"] .mention-item .m-path,
+html[dir="rtl"] .dl-tier {
+  margin-left: 0;
+  margin-right: auto;
+}
+html[dir="rtl"] .composer .hint {
+  right: auto;
+  left: 20px;
+}
+html[dir="rtl"] .doi-chip .doi-code {
+  margin-left: 0;
+  margin-right: 4px;
+}
+html[dir="rtl"] .session-title,
+html[dir="rtl"] .admin-table th,
+html[dir="rtl"] .admin-table td,
+html[dir="rtl"] .agent-card {
+  text-align: right;
+}
+/* Bubble *placement* already mirrors: the message column is a flex column, so
+   `align-self: flex-end` follows the inline direction. Only the tail corner —
+   a physical border radius — has to be flipped by hand. */
+html[dir="rtl"] .msg.user {
+  border-bottom-right-radius: var(--radius);
+  border-bottom-left-radius: 4px;
+}
+html[dir="rtl"] .msg.assistant {
+  border-bottom-left-radius: var(--radius);
+  border-bottom-right-radius: 4px;
+}

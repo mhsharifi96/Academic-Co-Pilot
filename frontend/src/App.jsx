@@ -12,9 +12,16 @@ import MessageInput from "./components/MessageInput.jsx";
 import GuidelinesPage from "./components/GuidelinesPage.jsx";
 import AdminPage from "./components/AdminPage.jsx";
 import LoginPage from "./components/LoginPage.jsx";
+import AdminWizardsPage from "./components/AdminWizardsPage.jsx";
+import WizardDetail from "./components/WizardDetail.jsx";
+import WizardLanding from "./components/WizardLanding.jsx";
+import WizardRunner from "./components/WizardRunner.jsx";
+import WizardRunsPage from "./components/WizardRunsPage.jsx";
+import { navigate, replace, useHashRoute } from "./router.js";
 
-export default function App() {
-  const [user, setUser] = useState(() => auth.getUser());
+// The existing chat application. `user` is owned by the router shell below so
+// the public wizard pages can render before this component's auth gate.
+function ChatApp({ user, setUser }) {
   const [sessionId, setSessionId] = useState(null);
   const [sessions, setSessions] = useState([]); // {id, title, updated_at}
   const [messages, setMessages] = useState([]); // {role, content}
@@ -314,7 +321,10 @@ export default function App() {
         sessionId={sessionId}
         onNewSession={startNewSession}
         view={view}
-        onNavigate={setView}
+        // The wizard pages live on their own hash routes so their links are
+        // shareable; that nav item hands over to the router instead of
+        // switching this component's local view.
+        onNavigate={(next) => (next === "wizards" ? navigate("/") : setView(next))}
         user={user}
         onLogout={handleLogout}
       />
@@ -395,4 +405,63 @@ export default function App() {
       )}
     </div>
   );
+}
+
+// Where the user was headed before the login gate stopped them, so they land on
+// the wizard they clicked rather than on the chat home page.
+const PENDING_KEY = "paperagent.pendingRoute";
+
+export default function App() {
+  const [user, setUser] = useState(() => auth.getUser());
+  const { route } = useHashRoute();
+
+  // The 401 handler fires from anywhere in the app; clearing `user` here is
+  // what swaps the whole tree back to the login screen.
+  useEffect(() => {
+    const handler = () => setUser(null);
+    window.addEventListener("auth:logout", handler);
+    return () => window.removeEventListener("auth:logout", handler);
+  }, []);
+
+  // Resume an interrupted destination once the user signs in.
+  useEffect(() => {
+    if (!user) return;
+    let pending = null;
+    try {
+      pending = sessionStorage.getItem(PENDING_KEY);
+      sessionStorage.removeItem(PENDING_KEY);
+    } catch {
+      /* storage disabled */
+    }
+    if (pending) replace(pending);
+  }, [user]);
+
+  function requireLogin(slug) {
+    try {
+      sessionStorage.setItem(PENDING_KEY, `/wizards/${encodeURIComponent(slug)}`);
+    } catch {
+      /* storage disabled */
+    }
+    navigate("/app");
+  }
+
+  // Public routes render ahead of ChatApp's auth gate.
+  if (route.name === "landing") return <WizardLanding user={user} />;
+  if (route.name === "wizard") {
+    return (
+      <WizardDetail slug={route.params.slug} user={user} onRequireLogin={requireLogin} />
+    );
+  }
+
+  // Everything below needs an account. Falling through to ChatApp shows its
+  // login screen, and the pending-route effect above brings them back here.
+  if (user) {
+    if (route.name === "run") return <WizardRunner runId={route.params.runId} />;
+    if (route.name === "runs") return <WizardRunsPage />;
+    if (route.name === "adminWizards") {
+      return user.is_admin ? <AdminWizardsPage /> : <WizardRunsPage />;
+    }
+  }
+
+  return <ChatApp user={user} setUser={setUser} />;
 }

@@ -6,8 +6,10 @@ import { authHeader, onUnauthorized } from "./auth.js";
 
 const BASE = "/api/v1";
 
-async function request(path, { method = "GET", body, isForm = false } = {}) {
-  const headers = { ...authHeader() };
+async function request(path, { method = "GET", body, isForm = false, anon = false } = {}) {
+  // `anon` requests are for the public wizard catalogue: they must work for a
+  // signed-out visitor, so they carry no token and never trigger a logout.
+  const headers = anon ? {} : { ...authHeader() };
   let payload = body;
   if (body && !isForm) {
     headers["Content-Type"] = "application/json";
@@ -15,7 +17,7 @@ async function request(path, { method = "GET", body, isForm = false } = {}) {
   }
   const res = await fetch(`${BASE}${path}`, { method, headers, body: payload });
 
-  if (res.status === 401) {
+  if (res.status === 401 && !anon) {
     onUnauthorized();
     throw new Error("Your session expired — please log in again.");
   }
@@ -103,6 +105,110 @@ export async function getDownload(jobId) {
 export async function listDownloads(sessionId) {
   const qs = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
   return request(`/downloads${qs}`);
+}
+
+// ----- Wizards (guided workflows) -----
+//
+// `lang` selects which language's content columns the server resolves; it is
+// not a UI-only concern, so every wizard call carries it.
+
+const lq = (lang) => `lang=${encodeURIComponent(lang || "en")}`;
+
+// Public: no token needed, works for signed-out visitors on the landing page.
+export async function listWizards(lang) {
+  return request(`/wizards?${lq(lang)}`, { anon: true });
+}
+
+export async function getWizard(slug, lang) {
+  return request(`/wizards/${encodeURIComponent(slug)}?${lq(lang)}`, { anon: true });
+}
+
+// Starts a run, or returns the caller's existing active run of the same wizard
+// (with its transcript), which is what "continue" uses.
+export async function startWizardRun({ wizardId, slug }, lang) {
+  return request(`/wizard-runs?${lq(lang)}`, {
+    method: "POST",
+    body: { wizard_id: wizardId, slug },
+  });
+}
+
+export async function listWizardRuns(status, lang) {
+  const s = status ? `&status=${encodeURIComponent(status)}` : "";
+  return request(`/wizard-runs?${lq(lang)}${s}`);
+}
+
+export async function getWizardRun(runId, lang) {
+  return request(`/wizard-runs/${encodeURIComponent(runId)}?${lq(lang)}`);
+}
+
+export async function sendWizardMessage(runId, message, lang) {
+  return request(`/wizard-runs/${encodeURIComponent(runId)}/messages?${lq(lang)}`, {
+    method: "POST",
+    body: { message },
+  });
+}
+
+export async function resumeWizardRun(runId, decision, { editedArgs, reason } = {}, lang) {
+  return request(`/wizard-runs/${encodeURIComponent(runId)}/resume?${lq(lang)}`, {
+    method: "POST",
+    body: { decision, edited_args: editedArgs, reason },
+  });
+}
+
+export async function abandonWizardRun(runId) {
+  return request(`/wizard-runs/${encodeURIComponent(runId)}`, { method: "DELETE" });
+}
+
+// ----- Wizard admin -----
+
+export async function adminListWizards() {
+  return request("/admin/wizards");
+}
+
+export async function adminGetWizard(wizardId) {
+  return request(`/admin/wizards/${encodeURIComponent(wizardId)}`);
+}
+
+export async function adminCreateWizard(fields) {
+  return request("/admin/wizards", { method: "POST", body: fields });
+}
+
+export async function adminUpdateWizard(wizardId, fields) {
+  return request(`/admin/wizards/${encodeURIComponent(wizardId)}`, {
+    method: "PATCH",
+    body: fields,
+  });
+}
+
+export async function adminDeleteWizard(wizardId) {
+  return request(`/admin/wizards/${encodeURIComponent(wizardId)}`, { method: "DELETE" });
+}
+
+export async function adminCreateStep(wizardId, fields) {
+  return request(`/admin/wizards/${encodeURIComponent(wizardId)}/steps`, {
+    method: "POST",
+    body: fields,
+  });
+}
+
+export async function adminUpdateStep(stepId, fields) {
+  return request(`/admin/wizard-steps/${encodeURIComponent(stepId)}`, {
+    method: "PATCH",
+    body: fields,
+  });
+}
+
+export async function adminDeleteStep(stepId) {
+  return request(`/admin/wizard-steps/${encodeURIComponent(stepId)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function adminReorderSteps(wizardId, stepIds) {
+  return request(`/admin/wizards/${encodeURIComponent(wizardId)}/steps/reorder`, {
+    method: "PUT",
+    body: { step_ids: stepIds },
+  });
 }
 
 // ----- Account / admin -----

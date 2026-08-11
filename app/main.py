@@ -10,6 +10,7 @@ from app.api.v1.endpoints import (
     auth,
     admin,
     downloads,
+    wizard,
 )
 from app.core.checkpointer import build_checkpointer_cm
 from app.core.config import settings
@@ -80,6 +81,7 @@ app.include_router(ingestion.router, prefix="/api/v1", tags=["ingestion"])
 app.include_router(sessions.router, prefix="/api/v1", tags=["sessions"])
 app.include_router(files.router, prefix="/api/v1", tags=["files"])
 app.include_router(downloads.router, prefix="/api/v1", tags=["downloads"])
+app.include_router(wizard.router, prefix="/api/v1", tags=["wizard"])
 
 @app.get("/")
 async def root():
