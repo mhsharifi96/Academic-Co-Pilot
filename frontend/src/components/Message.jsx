@@ -63,7 +63,11 @@ export default function Message({ role, content, onRequestPdf }) {
     return (
       <div className="msg user">
         <div className="role">You</div>
-        <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+        {/* dir="auto" so each message reads in ITS OWN direction: the UI can be
+            Persian (RTL) while a given message is English, or the reverse.
+            Without it the bubble inherits the page direction and bidi reorders
+            the text — trailing punctuation jumps to the front. */}
+        <div dir="auto" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
           {content}
         </div>
         {doiActions}
@@ -74,7 +78,7 @@ export default function Message({ role, content, onRequestPdf }) {
   return (
     <div className="msg assistant">
       <div className="role">Co-Pilot</div>
-      <div className="md">
+      <div className="md" dir="auto">
         <ReactMarkdown
           components={{
             a({ href, children, ...props }) {

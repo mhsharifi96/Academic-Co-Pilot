@@ -1498,7 +1498,11 @@ button.ghost {
    ---------------------------------------------------------------------- */
 :root {
   --font-display: "Crimson Pro", Georgia, "Times New Roman", serif;
-  --font-fa: "Vazirmatn", var(--font);
+  /* Deliberately self-contained — must NOT reference var(--font). The RTL block
+     below points --font at this one, and a custom-property cycle makes BOTH
+     invalid at computed-value time, dropping the whole Persian UI to the
+     browser's default serif. */
+  --font-fa: "Vazirmatn", "Segoe UI", Tahoma, Arial, sans-serif;
 
   --wz-surface: #141824;
   --wz-surface-2: #1a2030;
@@ -1530,14 +1534,26 @@ html[dir="rtl"] {
   grid-row: 1 / -1;
   display: flex;
   flex-direction: column;
-  min-height: 100dvh;
-  overflow-y: auto;
   background:
     radial-gradient(80rem 40rem at 50% -10rem, var(--wz-glow), transparent 70%),
     var(--bg);
 }
+
+/* The landing page is a document: it grows and scrolls as a whole. */
+.wz-landing {
+  min-height: 100dvh;
+  overflow-y: auto;
+}
+
+/* The runner is an app shell, and must NOT grow. `height` (not `min-height`)
+   pins it to the viewport so the topbar, stepper and composer stay put and only
+   .wz-thread scrolls. With `min-height` the column grew as messages piled up,
+   pushing past the viewport until the whole document scrolled — taking the
+   header with it. */
 .wz-runner {
-  overflow: hidden; /* the thread scrolls, not the page */
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .wz-topbar {
@@ -1548,6 +1564,9 @@ html[dir="rtl"] {
   border-block-end: 1px solid var(--wz-border);
   background: rgba(15, 17, 23, 0.72);
   backdrop-filter: blur(10px);
+  /* Sticky for the landing page, which page-scrolls; `flex: none` is what holds
+     it in the runner, whose shell doesn't scroll at all. */
+  flex: none;
   position: sticky;
   inset-block-start: 0;
   z-index: 5;
@@ -1693,6 +1712,13 @@ html[dir="rtl"] .wz-btn:hover .wz-go-arrow {
 }
 .lang-option:hover {
   color: var(--text);
+}
+/* The Persian label must carry a Persian face even while the UI is in English —
+   `--font` only swaps to Vazirmatn under dir="rtl", so without this the glyphs
+   fall through to a Latin stack and render as tofu on any machine without an
+   Arabic-capable system font. */
+.lang-option[lang="fa"] {
+  font-family: var(--font-fa);
 }
 .lang-option.active {
   background: var(--accent);
@@ -2036,13 +2062,14 @@ html[dir="rtl"] .wz-eyebrow {
   background: var(--wz-surface);
   display: grid;
   gap: var(--space-2);
-  /* Pinned under the topbar so the step, the progress and the Finish control
-     stay reachable however far the conversation has scrolled. `flex: none`
-     stops the flex column from compressing it as the thread grows. */
+  /* `flex: none` is what actually keeps this visible: the runner shell is
+     viewport-height and only .wz-thread scrolls, so the stepper never moves.
+     `sticky` is a cheap fallback for a browser that mishandles dvh and lets the
+     shell page-scroll anyway. */
+  flex: none;
   position: sticky;
   inset-block-start: 0;
   z-index: 4;
-  flex: none;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
 }
 .wz-stepper-head {
@@ -2119,7 +2146,11 @@ html[dir="rtl"] .wz-progress-fill {
   font-weight: 600;
 }
 .wz-thread {
-  flex: 1;
+  flex: 1 1 auto;
+  /* Required, not cosmetic: a flex item's default `min-height: auto` refuses to
+     shrink below its content, so without this the thread expands to fit every
+     message and `overflow-y` never engages. */
+  min-height: 0;
   overflow-y: auto;
   padding: var(--space-4);
   display: flex;
@@ -2178,6 +2209,8 @@ html[dir="rtl"] .wz-progress-fill {
   width: 100%;
   max-width: 56rem;
   margin-inline: auto;
+  /* Never let the auto-growing textarea be compressed by the thread above it. */
+  flex: none;
 }
 
 /* ---------- Runs list ---------- */
