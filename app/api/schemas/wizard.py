@@ -119,6 +119,19 @@ class WizardTurnResponse(BaseModel):
     balance: Optional[float] = None
 
 
+class SuggestionOut(BaseModel):
+    question: str
+    reason: str = ""
+
+
+class SuggestionsResponse(BaseModel):
+    """Follow-up questions the user could send next. Generated on request."""
+
+    run_id: str
+    suggestions: List[SuggestionOut] = []
+    balance: Optional[float] = None
+
+
 class AbandonRunResponse(BaseModel):
     run_id: str
     abandoned: bool

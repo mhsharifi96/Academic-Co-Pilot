@@ -148,6 +148,14 @@ export async function sendWizardMessage(runId, message, lang) {
   });
 }
 
+// Ask for follow-up questions the user could send next. This IS an LLM call and
+// is billed, so it is only ever fired from an explicit user action.
+export async function suggestWizardQuestions(runId, lang) {
+  return request(`/wizard-runs/${encodeURIComponent(runId)}/suggestions?${lq(lang)}`, {
+    method: "POST",
+  });
+}
+
 // Finish the current step now, without spending its remaining messages. Costs
 // nothing — no agent call.
 export async function advanceWizardRun(runId, lang) {

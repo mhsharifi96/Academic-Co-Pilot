@@ -100,6 +100,22 @@ authentication and persistence layer on top of the original agent MVP:
     the column's edge — floating mid-page, and on the inner edge in RTL. Split
     into a full-width `.wz-thread` scroller with a `.wz-thread-inner` column,
     matching the fix already applied to the chat.
+  - **Suggested follow-up questions.** A *Suggest questions* control above the
+    wizard composer asks a cheap model for three questions the user could send
+    next, given the step's goal and the tail of the conversation. Each is an
+    accordion: one line collapsed, expanding to the full question plus why it
+    helps, with a separate send icon so a stray click can never post something
+    unread. Written in the user's voice and in the active language, so the
+    chosen one is sent verbatim.
+    - **On demand, never automatic** (`POST /wizard-runs/{id}/suggestions`) —
+      it is a second LLM call and it is billed, so it only runs when asked.
+    - A plain model call, not an agent turn: no tools needed, and it must not
+      touch the LangGraph thread or land in the transcript.
+    - Prompt building and reply parsing are pure functions
+      (`build_suggestions_prompt`, `parse_suggestions`) tested offline; the
+      parser tolerates code fences and prose, drops duplicates and malformed
+      entries, and caps the count. The endpoint fails soft — a model error
+      returns no suggestions rather than blocking a user mid-conversation.
   - **The Finish control names its destination** ("Next: screen results"), so
     ending a step is a decision rather than a leap. Hidden below 640px where the
     header is already tight.

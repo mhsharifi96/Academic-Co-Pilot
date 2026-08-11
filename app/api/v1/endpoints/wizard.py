@@ -20,6 +20,8 @@ import shutil
 from typing import Any, Dict, List, Optional, Sequence
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,6 +34,8 @@ from app.api.schemas.wizard import (
     ReorderStepsRequest,
     StartRunRequest,
     StepAdminOut,
+    SuggestionOut,
+    SuggestionsResponse,
     StepCreate,
     StepUpdate,
     WizardAdminDetailOut,
@@ -67,6 +71,15 @@ from app.services.billing_service import charge_usage, has_sufficient_balance
 router = APIRouter()
 
 LangQuery = Query(default="en", description="Content language: 'en' or 'fa'.")
+
+# Suggestions are written AS THE USER, because the UI sends the chosen one
+# verbatim as their next message.
+_SUGGESTION_SYSTEM = (
+    "You help a researcher decide what to ask next while they work through a "
+    "guided academic workflow. You do not answer their questions and you do not "
+    "address them — you write the questions they could send, in their voice, in "
+    "the first person. Output JSON only."
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -468,6 +481,91 @@ async def _finish_turn(
         # Only worth offering while the step is still the current one — the cap
         # may already have moved the run on, in which case the offer is moot.
         step_complete_suggested=suggested and not outcome.advanced and not outcome.completed,
+    )
+
+
+@router.post("/wizard-runs/{run_id}/suggestions", response_model=SuggestionsResponse)
+async def suggest_questions(
+    run_id: str,
+    lang: str = LangQuery,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> SuggestionsResponse:
+    """
+    Propose follow-up questions the user could send next on this step.
+
+    On demand, never automatic: it is a second LLM call and it is billed, so it
+    only runs when the user asks. Deliberately a plain model call rather than an
+    agent turn — it needs no tools, must not touch the LangGraph thread, and
+    must not land in the transcript. Nothing here mutates the run.
+    """
+    locale = svc.resolve_locale(lang)
+    run = await svc.get_owned_run(db, current_user, run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found.")
+    if run.status != STATUS_ACTIVE:
+        raise HTTPException(
+            status_code=409, detail=f"This run is {run.status}."
+        )
+
+    wizard, steps = await _load_run_context(db, run)
+    current = next((s for s in steps if s.id == run.current_step_id), None)
+    if current is None:
+        raise HTTPException(
+            status_code=409,
+            detail="This run's current step no longer exists; start the wizard again.",
+        )
+
+    if not has_sufficient_balance(current_user):
+        raise HTTPException(
+            status_code=402,
+            detail=(
+                "Your balance is exhausted. Please contact an administrator to "
+                "top up your account before continuing."
+            ),
+        )
+
+    prompt = svc.build_suggestions_prompt(
+        wizard_title=svc.localized(wizard, "title", locale) or wizard.name,
+        step_name=svc.localized(current, "name", locale),
+        guideline_prompt=current.guideline_prompt,
+        transcript=await svc.list_run_messages(db, run.id),
+        lang=locale,
+    )
+
+    try:
+        llm = ChatOpenAI(
+            model=settings.GUARDRAIL_MODEL or settings.OPENAI_MODEL,
+            api_key=settings.OPENAI_API_KEY,
+            temperature=0.4,  # a little variety; these are prompts, not facts
+        )
+        resp = await llm.ainvoke(
+            [SystemMessage(content=_SUGGESTION_SYSTEM), HumanMessage(content=prompt)]
+        )
+    except Exception:
+        # Suggestions are a convenience. Failing the request would block a user
+        # who is mid-conversation, so return nothing and let them keep typing.
+        return SuggestionsResponse(run_id=run.id, suggestions=[])
+
+    content = resp.content if isinstance(resp.content, str) else str(resp.content)
+    suggestions = svc.parse_suggestions(content)
+
+    meta = getattr(resp, "usage_metadata", None) or {}
+    balance = await charge_usage(
+        db,
+        current_user,
+        {
+            "input_tokens": meta.get("input_tokens", 0),
+            "output_tokens": meta.get("output_tokens", 0),
+        },
+        run.session_id,
+    )
+    return SuggestionsResponse(
+        run_id=run.id,
+        suggestions=[
+            SuggestionOut(question=s.question, reason=s.reason) for s in suggestions
+        ],
+        balance=balance if settings.ENABLE_BILLING else None,
     )
 
 

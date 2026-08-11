@@ -5,6 +5,7 @@ import { navigate } from "../router.js";
 import InterruptCard from "./InterruptCard.jsx";
 import LangToggle from "./LangToggle.jsx";
 import Message from "./Message.jsx";
+import SuggestedQuestions from "./SuggestedQuestions.jsx";
 import Icon from "./Icon.jsx";
 import WizardStepper from "./WizardStepper.jsx";
 
@@ -27,6 +28,10 @@ export default function WizardRunner({ runId }) {
   // until the user chooses to move on.
   const [suggested, setSuggested] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  // Suggested follow-up questions. Only ever populated by an explicit user
+  // action — generating them is a billed LLM call.
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggesting, setSuggesting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [booting, setBooting] = useState(true);
   const [error, setError] = useState("");
@@ -90,6 +95,8 @@ export default function WizardRunner({ runId }) {
     );
     // A step that just advanced can't also be pending completion.
     setSuggested(!!res.step_complete_suggested);
+    // Suggestions were written against the previous reply; they are stale now.
+    setSuggestions([]);
     if (res.completed) {
       setNotice("");
     } else if (res.step_advanced && res.current_step?.name) {
@@ -113,8 +120,22 @@ export default function WizardRunner({ runId }) {
     }
   }
 
-  async function send() {
-    const text = draft.trim();
+  async function requestSuggestions() {
+    if (suggesting) return;
+    setSuggesting(true);
+    setError("");
+    try {
+      const res = await api.suggestWizardQuestions(runId, lang);
+      setSuggestions(res.suggestions || []);
+      if (!(res.suggestions || []).length) setError(t("suggest.empty"));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  async function sendText(text) {
     if (!text || loading) return;
     setDraft("");
     setLoading(true);
@@ -129,6 +150,8 @@ export default function WizardRunner({ runId }) {
       setLoading(false);
     }
   }
+
+  const send = () => sendText(draft.trim());
 
   async function resume(decision, opts) {
     setLoading(true);
@@ -276,6 +299,14 @@ export default function WizardRunner({ runId }) {
 
       {!done && !abandoned && (
         <div className="composer wz-composer">
+          <SuggestedQuestions
+            suggestions={suggestions}
+            loading={suggesting}
+            disabled={composerDisabled}
+            onRequest={requestSuggestions}
+            onSend={sendText}
+            onDismiss={() => setSuggestions([])}
+          />
           <div className="composer-inner">
             <textarea
               ref={taRef}

@@ -338,6 +338,9 @@ UI: `AdminPage.jsx`.
 - **Wizard landing page** — a **public**, bilingual (en/fa, RTL-aware) catalogue of
   guided workflows at `#/`, reachable without signing in; picking one leads to a
   detail page with the step outline, then to the runner.
+- **Suggested questions** — on request, three follow-up questions tailored to the
+  current step, each expandable for the full text and a reason, each sendable
+  with one click.
 - **Wizard runner** — the guided chat: a **sticky** stepper showing "Step 2 of 5",
   a progress bar, the current step's name, and how many messages remain before
   the workflow moves on; a **Finish step** control to move on early; an inline
@@ -386,6 +389,7 @@ UI: `AdminPage.jsx`.
 | `GET /api/v1/wizard-runs?status=` | Your runs, most recently active first |
 | `GET /api/v1/wizard-runs/{id}` | One run + its persisted transcript |
 | `POST /api/v1/wizard-runs/{id}/messages` | Take a turn (advances the step when the cap is used up) |
+| `POST /api/v1/wizard-runs/{id}/suggestions` | Three follow-up questions the user could send next (billed) |
 | `POST /api/v1/wizard-runs/{id}/advance` | Finish the current step now, ignoring its message cap |
 | `POST /api/v1/wizard-runs/{id}/resume` | Approve / edit / reject a paused tool call in a run |
 | `DELETE /api/v1/wizard-runs/{id}` | Abandon a run (transcript kept, thread + files cleared) |

@@ -170,6 +170,110 @@ def test_completion_signal_handles_empty_input():
 
 
 # --------------------------------------------------------------------------- #
+# Suggested follow-up questions
+# --------------------------------------------------------------------------- #
+def msg(role, content, **kw):
+    return types.SimpleNamespace(role=role, content=content, **kw)
+
+
+def _prompt(**overrides):
+    kwargs = dict(
+        wizard_title="Systematic Review",
+        step_name="Build the search",
+        guideline_prompt="Turn the question into database queries and run them.",
+        transcript=[
+            msg("user", "I want to study AI in HR"),
+            msg("assistant", "Which databases do you have access to?"),
+        ],
+        lang="en",
+    )
+    kwargs.update(overrides)
+    return svc.build_suggestions_prompt(**kwargs)
+
+
+def test_suggestions_prompt_carries_the_step_goal_and_conversation():
+    p = _prompt()
+    assert "Systematic Review" in p
+    assert "Build the search" in p
+    assert "Turn the question into database queries" in p
+    assert "I want to study AI in HR" in p
+    assert "Which databases do you have access to?" in p
+
+
+def test_suggestions_prompt_asks_for_the_users_voice_and_a_count():
+    p = _prompt()
+    assert "first person" in p
+    assert str(svc.SUGGESTION_COUNT) in p
+
+
+def test_suggestions_prompt_requests_the_active_language():
+    assert "Persian (Farsi)" in _prompt(lang="fa")
+    assert "English" in _prompt(lang="en")
+
+
+def test_suggestions_prompt_handles_an_empty_conversation():
+    p = _prompt(transcript=[])
+    assert "has not started yet" in p
+
+
+def test_suggestions_prompt_is_bounded():
+    # It is billed to the user, so only the tail is sent and long messages clip.
+    long = msg("assistant", "x" * 5000)
+    history = [msg("user", f"turn {i}") for i in range(20)] + [long]
+    p = _prompt(transcript=history)
+    assert "turn 0" not in p          # older turns dropped
+    assert "turn 19" in p             # recent ones kept
+    assert "x" * 5000 not in p        # long message clipped
+    assert "…" in p
+
+
+def test_parse_suggestions_reads_a_plain_array():
+    got = svc.parse_suggestions(
+        '[{"question": "Which databases?", "reason": "Scopes the search."},'
+        ' {"question": "Which years?", "reason": "Bounds the corpus."}]'
+    )
+    assert [s.question for s in got] == ["Which databases?", "Which years?"]
+    assert got[0].reason == "Scopes the search."
+
+
+def test_parse_suggestions_tolerates_fences_and_prose():
+    raw = (
+        "Sure! Here you go:\n```json\n"
+        '[{"question": "Which databases?"}]\n```\nHope that helps.'
+    )
+    got = svc.parse_suggestions(raw)
+    assert len(got) == 1 and got[0].question == "Which databases?"
+    assert got[0].reason == ""
+
+
+def test_parse_suggestions_caps_the_count():
+    raw = "[" + ",".join(f'{{"question": "q{i}"}}' for i in range(10)) + "]"
+    assert len(svc.parse_suggestions(raw)) == svc.SUGGESTION_COUNT
+
+
+def test_parse_suggestions_drops_duplicates_and_blanks():
+    raw = (
+        '[{"question": "Same one"}, {"question": "same ONE"},'
+        ' {"question": "   "}, {"question": "Different"}]'
+    )
+    got = svc.parse_suggestions(raw)
+    assert [s.question for s in got] == ["Same one", "Different"]
+
+
+def test_parse_suggestions_skips_malformed_entries_without_failing():
+    raw = '[{"question": "Good one"}, "not an object", {"no_question": 1}, 42]'
+    got = svc.parse_suggestions(raw)
+    assert [s.question for s in got] == ["Good one"]
+
+
+@pytest.mark.parametrize(
+    "raw", ["", None, "no json here", "{}", "[", '{"question": "not a list"}']
+)
+def test_parse_suggestions_returns_empty_on_junk(raw):
+    assert svc.parse_suggestions(raw) == []
+
+
+# --------------------------------------------------------------------------- #
 # messages_left
 # --------------------------------------------------------------------------- #
 def test_messages_left():

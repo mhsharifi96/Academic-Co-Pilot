@@ -20,6 +20,7 @@ system prompt.
 
 from __future__ import annotations
 
+import json
 import re
 import unicodedata
 from dataclasses import dataclass
@@ -258,6 +259,102 @@ def extract_completion_signal(text: str) -> tuple[str, bool]:
     # Collapse the blank lines the removal leaves behind.
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
     return cleaned, True
+
+
+# --------------------------------------------------------------------------- #
+# Pure helpers — suggested follow-up questions
+# --------------------------------------------------------------------------- #
+SUGGESTION_COUNT = 3
+
+# Keep the prompt cheap: this runs on demand and is billed to the user, so only
+# the tail of the conversation is sent and each message is clipped.
+SUGGESTION_HISTORY_TURNS = 6
+SUGGESTION_EXCERPT_CHARS = 700
+
+
+@dataclass(frozen=True)
+class Suggestion:
+    question: str
+    reason: str = ""
+
+
+def build_suggestions_prompt(
+    *,
+    wizard_title: str,
+    step_name: str,
+    guideline_prompt: str,
+    transcript: Sequence[Any],
+    lang: str = DEFAULT_LANGUAGE,
+) -> str:
+    """
+    Build the user-side prompt asking a cheap model for follow-up questions.
+
+    The questions are written **as the user**, in the first person, because the
+    UI sends the chosen one verbatim as their next message.
+    """
+    recent = list(transcript)[-SUGGESTION_HISTORY_TURNS:]
+    lines = []
+    for m in recent:
+        role = "User" if getattr(m, "role", "") == ROLE_USER else "Assistant"
+        text = (getattr(m, "content", "") or "").strip()
+        if len(text) > SUGGESTION_EXCERPT_CHARS:
+            text = text[:SUGGESTION_EXCERPT_CHARS] + "…"
+        if text:
+            lines.append(f"{role}: {text}")
+    convo = "\n\n".join(lines) if lines else "(the conversation has not started yet)"
+
+    language = "Persian (Farsi)" if lang == "fa" else "English"
+    return (
+        f'The user is working through the "{wizard_title}" workflow.\n'
+        f'They are on the step "{step_name}", whose goal is:\n'
+        f"{guideline_prompt.strip()}\n\n"
+        f"Conversation so far:\n{convo}\n\n"
+        f"Propose exactly {SUGGESTION_COUNT} questions the USER could send next "
+        f"to make progress on this step. Write each one in the first person, as "
+        f"the user would type it, and in {language}. They must be specific to "
+        f"this conversation — never generic filler — must not repeat something "
+        f"already asked, and must be short enough to read at a glance. For each, "
+        f"add one short sentence saying why it helps.\n\n"
+        'Reply with ONLY a JSON array, no prose:\n'
+        '[{"question": "...", "reason": "..."}, ...]'
+    )
+
+
+def parse_suggestions(raw: str) -> List[Suggestion]:
+    """
+    Parse the model's reply into at most ``SUGGESTION_COUNT`` suggestions.
+
+    Tolerates code fences and surrounding prose, and drops malformed entries
+    rather than failing the whole request — a partial list is still useful, and
+    the caller treats an empty list as "no suggestions available".
+    """
+    text = (raw or "").strip()
+    match = re.search(r"\[.*\]", text, re.DOTALL)
+    if not match:
+        return []
+    try:
+        data = json.loads(match.group(0))
+    except (ValueError, TypeError):
+        return []
+    if not isinstance(data, list):
+        return []
+
+    out: List[Suggestion] = []
+    seen = set()
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        question = str(item.get("question", "") or "").strip()
+        if not question:
+            continue
+        key = question.casefold()
+        if key in seen:  # models sometimes repeat themselves
+            continue
+        seen.add(key)
+        out.append(Suggestion(question=question, reason=str(item.get("reason", "") or "").strip()))
+        if len(out) == SUGGESTION_COUNT:
+            break
+    return out
 
 
 # --------------------------------------------------------------------------- #
