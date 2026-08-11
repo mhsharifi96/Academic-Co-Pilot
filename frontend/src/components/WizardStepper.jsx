@@ -13,6 +13,9 @@ export default function WizardStepper({ run, onFinishStep, finishing, suggested 
   const done = run.status === "completed";
   const pct = total > 0 ? Math.round(((done ? total : Math.max(0, index - 1)) / total) * 100) : 0;
   const left = run.messages_left_in_step;
+  // `steps` is ordered and `index` is 1-based, so the next step sits at [index].
+  // Naming where "Finish step" leads makes it a decision rather than a leap.
+  const nextStep = !done && index > 0 ? (run.steps || [])[index] : null;
 
   return (
     <div className="wz-stepper">
@@ -45,18 +48,29 @@ export default function WizardStepper({ run, onFinishStep, finishing, suggested 
             said the step looks finished — but never auto-advancing: moving on
             stays the user's decision. */}
         {!done && onFinishStep && (
-          <button
-            type="button"
-            className={`wz-btn small wz-finish-step${suggested ? " suggested" : " ghost"}`}
-            onClick={onFinishStep}
-            disabled={finishing}
-            title={t(index >= total ? "runner.finishWorkflowHint" : "runner.finishStepHint")}
-          >
-            {finishing
-              ? t("common.saving")
-              : t(index >= total ? "runner.finishWorkflow" : "runner.finishStep")}
-            <Icon name="arrow" size={15} className="wz-go-arrow" />
-          </button>
+          <span className="wz-finish-group">
+            <button
+              type="button"
+              className={`wz-btn small wz-finish-step${suggested ? " suggested" : " ghost"}`}
+              onClick={onFinishStep}
+              disabled={finishing}
+              title={
+                nextStep?.name
+                  ? t("runner.finishStepToHint", { name: nextStep.name })
+                  : t(index >= total ? "runner.finishWorkflowHint" : "runner.finishStepHint")
+              }
+            >
+              {finishing
+                ? t("common.saving")
+                : t(index >= total ? "runner.finishWorkflow" : "runner.finishStep")}
+              <Icon name="arrow" size={15} className="wz-go-arrow" />
+            </button>
+            {nextStep?.name && (
+              <span className="wz-next-step" title={nextStep.name}>
+                {t("runner.nextIs", { name: nextStep.name })}
+              </span>
+            )}
+          </span>
         )}
       </div>
 

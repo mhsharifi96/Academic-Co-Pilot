@@ -185,6 +185,7 @@ export default function WizardRunner({ runId }) {
       )}
 
       <div className="wz-thread">
+        <div className="wz-thread-inner">
         {error && <div className="banner-error">⚠️ {error}</div>}
 
         {booting ? (
@@ -269,7 +270,8 @@ export default function WizardRunner({ runId }) {
           </>
         )}
 
-        <div ref={endRef} />
+          <div ref={endRef} />
+        </div>
       </div>
 
       {!done && !abandoned && (

@@ -2174,6 +2174,10 @@ html[dir="rtl"] .wz-progress-fill {
   font-size: 1.05rem;
   font-weight: 600;
 }
+/* The scroll container spans the FULL pane. It must not also be the centred
+   column: a width-limited element that scrolls puts its scrollbar at its own
+   edge, leaving it floating in the middle of the page instead of at the side of
+   the window (and on the inner edge of the column in RTL). */
 .wz-thread {
   flex: 1 1 auto;
   /* Required, not cosmetic: a flex item's default `min-height: auto` refuses to
@@ -2181,10 +2185,15 @@ html[dir="rtl"] .wz-progress-fill {
      message and `overflow-y` never engages. */
   min-height: 0;
   overflow-y: auto;
-  padding: var(--space-4);
+  width: 100%;
+}
+
+/* The reading column, centred inside the scroller. */
+.wz-thread-inner {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  padding: var(--space-4);
   width: 100%;
   max-width: 56rem;
   margin-inline: auto;
@@ -2797,4 +2806,29 @@ html[dir="rtl"] .msg.assistant {
   width: 100%;
   max-width: 56rem;
   margin-inline: auto;
+}
+
+/* ---------- "Finish step" + where it leads ---------- */
+.wz-finish-group {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+html[dir="rtl"] .wz-finish-group {
+  align-items: flex-start;
+}
+/* Names the destination so finishing a step is a decision, not a leap. */
+.wz-next-step {
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+@media (max-width: 640px) {
+  .wz-next-step {
+    display: none; /* the header is already tight on a phone */
+  }
 }

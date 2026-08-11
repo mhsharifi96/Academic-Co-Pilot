@@ -95,6 +95,14 @@ authentication and persistence layer on top of the original agent MVP:
     glyphs are SVG, matching the wizard surface; emoji can't take a colour
     token and mean nothing to a screen reader.
   - A shared focus-visible ring across chat, composer and sidebar controls.
+  - **Scrollbar moved back to the window edge.** The wizard transcript was both
+    the scroll container *and* the centred 56rem column, so its scrollbar sat at
+    the column's edge — floating mid-page, and on the inner edge in RTL. Split
+    into a full-width `.wz-thread` scroller with a `.wz-thread-inner` column,
+    matching the fix already applied to the chat.
+  - **The Finish control names its destination** ("Next: screen results"), so
+    ending a step is a decision rather than a leap. Hidden below 640px where the
+    header is already tight.
 - **`feature.md` — complete feature catalogue.** A single document listing every
   user-facing capability grouped by area (the two agents and session binding,
   guardrails and HITL, literature discovery across Scopus/arXiv/Crossref/OpenAlex,
