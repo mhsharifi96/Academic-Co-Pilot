@@ -409,6 +409,84 @@ def test_slugify_of_farsi_only_input_is_empty():
 
 
 # --------------------------------------------------------------------------- #
+# parse_step_outline — bulk step authoring
+# --------------------------------------------------------------------------- #
+def test_parse_outline_keeps_order_and_skips_blank_lines():
+    specs = svc.parse_step_outline("Define the question\n\n  \nScreen abstracts\n")
+    assert [s["name_en"] for s in specs] == ["Define the question", "Screen abstracts"]
+
+
+@pytest.mark.parametrize(
+    "line",
+    ["1. Define the question", "2) Define the question", "- Define the question",
+     "* Define the question", "• Define the question", "  3.  Define the question  "],
+)
+def test_parse_outline_strips_pasted_list_markers(line):
+    assert svc.parse_step_outline(line)[0]["name_en"] == "Define the question"
+
+
+def test_parse_outline_splits_bilingual_names_on_a_pipe():
+    spec = svc.parse_step_outline("Screen abstracts | غربالگری چکیده‌ها")[0]
+    assert spec["name_en"] == "Screen abstracts"
+    assert spec["name_fa"] == "غربالگری چکیده‌ها"
+
+
+def test_parse_outline_mirrors_a_one_sided_name_into_both_languages():
+    # Better than leaving a blank column the admin has to spot later.
+    assert svc.parse_step_outline("Screen abstracts")[0]["name_fa"] == "Screen abstracts"
+    farsi_only = svc.parse_step_outline("غربالگری چکیده‌ها")[0]
+    assert farsi_only["name_en"] == farsi_only["name_fa"] == "غربالگری چکیده‌ها"
+
+
+def test_parse_outline_applies_the_cap_and_default_prompt_to_every_step():
+    specs = svc.parse_step_outline("One\nTwo", max_messages=5)
+    assert [s["max_messages"] for s in specs] == [5, 5]
+    # The generated prompt names its step, so the editor is readable before the
+    # admin has written anything.
+    assert "One" in specs[0]["guideline_prompt"]
+    assert "Two" in specs[1]["guideline_prompt"]
+
+
+def test_parse_outline_uses_a_custom_template_and_tolerates_stray_braces():
+    specs = svc.parse_step_outline(
+        "Screen abstracts",
+        guideline_template="Goal: {name}. Reply as JSON {\"ok\": true}.",
+    )
+    # ``str.format`` would raise on the JSON braces — the substitution is literal.
+    assert specs[0]["guideline_prompt"] == (
+        'Goal: Screen abstracts. Reply as JSON {"ok": true}.'
+    )
+
+
+def test_parse_outline_defaults_to_an_uncapped_step():
+    assert svc.parse_step_outline("Screen abstracts")[0]["max_messages"] is None
+
+
+@pytest.mark.parametrize("outline", ["", "   ", "\n\n", "- \n* \n"])
+def test_parse_outline_rejects_an_empty_outline(outline):
+    with pytest.raises(ValueError):
+        svc.parse_step_outline(outline)
+
+
+def test_parse_outline_rejects_more_than_the_limit_rather_than_truncating():
+    outline = "\n".join(f"Step {i}" for i in range(svc.MAX_OUTLINE_STEPS + 1))
+    with pytest.raises(ValueError):
+        svc.parse_step_outline(outline)
+    at_limit = "\n".join(f"Step {i}" for i in range(svc.MAX_OUTLINE_STEPS))
+    assert len(svc.parse_step_outline(at_limit)) == svc.MAX_OUTLINE_STEPS
+
+
+def test_parse_outline_output_is_create_step_kwargs():
+    # The endpoint hands these straight to ``create_steps`` as WizardStep kwargs.
+    assert set(svc.parse_step_outline("One")[0]) == {
+        "name_en",
+        "name_fa",
+        "guideline_prompt",
+        "max_messages",
+    }
+
+
+# --------------------------------------------------------------------------- #
 # build_step_guidance
 # --------------------------------------------------------------------------- #
 def _guidance(**overrides):

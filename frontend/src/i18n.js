@@ -97,6 +97,11 @@ const STRINGS = {
     "runner.suggestGo": "Next step",
     "runner.welcome": "Send a message to begin.",
     "runner.loading": "Loading your workflow…",
+    "runner.attach": "Attach a file",
+    "runner.attachHint": "Attach a PDF or CSV — the assistant can use it from your next message.",
+    "runner.dropHere": "Drop your files here",
+    "runner.uploading": "Uploading…",
+    "runner.filesLabel": "Files in this workflow",
     "runner.balance": "Wallet",
     "runner.balanceHint": "Credit left in your wallet. Each message you send is billed to it.",
 
@@ -135,6 +140,20 @@ const STRINGS = {
       "Off lets this workflow accept messages outside the usual academic scope. Jailbreak protection always stays on.",
     "admin.steps": "Steps",
     "admin.addStep": "Add step",
+    "admin.addManySteps": "Add many…",
+    "admin.bulkOutline": "Outline",
+    "admin.bulkOutlineHint":
+      "One step per line, in order. Numbering and bullets are ignored. Name a step in both languages with “English | فارسی”.",
+    "admin.bulkPlaceholder":
+      "Define the research question\nScreen the literature\nIngest the selected PDFs\nDraft the introduction",
+    "admin.bulkCap": "Max messages per step",
+    "admin.bulkCapHint":
+      "Applied to every step created here. Leave blank for no limit — you can change each one afterwards.",
+    "admin.bulkPromptNote":
+      "Each step gets a placeholder guideline prompt naming it. Write the real prompt for each step below once they're created.",
+    "admin.bulkCreate_one": "Create {n} step",
+    "admin.bulkCreate_other": "Create {n} steps",
+    "admin.bulkCreateEmpty": "Create steps",
     "admin.stepNameEn": "Step name (English)",
     "admin.stepNameFa": "Step name (Persian)",
     "admin.guideline": "Guideline prompt",
@@ -244,6 +263,11 @@ const STRINGS = {
     "runner.suggestGo": "گام بعد",
     "runner.welcome": "برای شروع پیامی بفرستید.",
     "runner.loading": "در حال بارگذاری مسیر…",
+    "runner.attach": "پیوست فایل",
+    "runner.attachHint": "یک فایل PDF یا CSV پیوست کنید — دستیار از پیام بعدی شما می‌تواند از آن استفاده کند.",
+    "runner.dropHere": "فایل‌ها را این‌جا رها کنید",
+    "runner.uploading": "در حال بارگذاری…",
+    "runner.filesLabel": "فایل‌های این مسیر",
     "runner.balance": "کیف پول",
     "runner.balanceHint": "اعتبار باقی‌ماندهٔ کیف پول شما. هزینهٔ هر پیامی که می‌فرستید از آن کم می‌شود.",
 
@@ -282,6 +306,20 @@ const STRINGS = {
       "خاموش کردن آن اجازه می‌دهد این مسیر پیام‌های خارج از محدودهٔ دانشگاهی را هم بپذیرد. محافظت در برابر دستکاری همیشه فعال است.",
     "admin.steps": "گام‌ها",
     "admin.addStep": "افزودن گام",
+    "admin.addManySteps": "افزودن گروهی…",
+    "admin.bulkOutline": "فهرست گام‌ها",
+    "admin.bulkOutlineHint":
+      "در هر خط یک گام، به ترتیب. شماره و نشانهٔ فهرست نادیده گرفته می‌شود. برای نام دوزبانه از «English | فارسی» استفاده کنید.",
+    "admin.bulkPlaceholder":
+      "تعریف پرسش پژوهش\nغربالگری منابع\nبارگذاری مقاله‌های منتخب\nنگارش مقدمه",
+    "admin.bulkCap": "بیشینهٔ پیام هر گام",
+    "admin.bulkCapHint":
+      "برای همهٔ گام‌هایی که این‌جا ساخته می‌شوند اعمال می‌شود. برای نامحدود خالی بگذارید؛ بعداً هر گام را جداگانه می‌توانید تغییر دهید.",
+    "admin.bulkPromptNote":
+      "برای هر گام یک دستور موقت با نام همان گام ساخته می‌شود. پس از ساخته شدن، دستور واقعی هر گام را در پایین بنویسید.",
+    "admin.bulkCreate_one": "ساخت {n} گام",
+    "admin.bulkCreate_other": "ساخت {n} گام",
+    "admin.bulkCreateEmpty": "ساخت گام‌ها",
     "admin.stepNameEn": "نام گام (انگلیسی)",
     "admin.stepNameFa": "نام گام (فارسی)",
     "admin.guideline": "دستور گام",

@@ -36,6 +36,7 @@ from app.api.schemas.wizard import (
     StepAdminOut,
     SuggestionOut,
     SuggestionsResponse,
+    StepBulkCreate,
     StepCreate,
     StepUpdate,
     WizardAdminDetailOut,
@@ -840,6 +841,39 @@ async def admin_create_step(
     if step is None:
         raise HTTPException(status_code=404, detail="Wizard not found.")
     return StepAdminOut.model_validate(step)
+
+
+@router.post(
+    "/admin/wizards/{wizard_id}/steps/bulk",
+    response_model=List[StepAdminOut],
+    status_code=201,
+)
+async def admin_create_steps(
+    wizard_id: str,
+    body: StepBulkCreate,
+    _: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> List[StepAdminOut]:
+    """
+    Append a whole outline at once — one step name per line.
+
+    Saves an admin from repeating the single-step form for every step of a long
+    workflow. The steps land with a generated placeholder `guideline_prompt`,
+    which is the part they then write per step.
+    """
+    try:
+        specs = svc.parse_step_outline(
+            body.outline,
+            guideline_template=body.guideline_template,
+            max_messages=body.max_messages,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    steps = await svc.create_steps(db, wizard_id, specs)
+    if steps is None:
+        raise HTTPException(status_code=404, detail="Wizard not found.")
+    return [StepAdminOut.model_validate(s) for s in steps]
 
 
 @router.patch("/admin/wizard-steps/{step_id}", response_model=StepAdminOut)

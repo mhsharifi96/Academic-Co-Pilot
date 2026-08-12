@@ -207,6 +207,15 @@ export async function adminCreateStep(wizardId, fields) {
   });
 }
 
+// Append a whole outline (one step name per line) in one request. Returns the
+// created steps, in order.
+export async function adminCreateSteps(wizardId, fields) {
+  return request(`/admin/wizards/${encodeURIComponent(wizardId)}/steps/bulk`, {
+    method: "POST",
+    body: fields,
+  });
+}
+
 export async function adminUpdateStep(stepId, fields) {
   return request(`/admin/wizard-steps/${encodeURIComponent(stepId)}`, {
     method: "PATCH",

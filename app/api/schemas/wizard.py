@@ -223,6 +223,22 @@ class StepCreate(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class StepBulkCreate(BaseModel):
+    """
+    An outline — one step name per line — appended as steps in that order.
+
+    Every created step gets the same ``max_messages`` and the same generated
+    ``guideline_prompt``; the admin then edits each one. Parsing rules live in
+    ``wizard_service.parse_step_outline``.
+    """
+
+    outline: str
+    max_messages: Optional[int] = Field(default=None, ge=1)
+    # ``{name}`` is replaced with the step's name. Blank uses the service's
+    # default template.
+    guideline_template: str = ""
+
+
 class StepUpdate(BaseModel):
     name_en: Optional[str] = None
     name_fa: Optional[str] = None

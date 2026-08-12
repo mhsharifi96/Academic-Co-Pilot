@@ -119,6 +119,57 @@ authentication and persistence layer on top of the original agent MVP:
   - **The Finish control names its destination** ("Next: screen results"), so
     ending a step is a decision rather than a leap. Hidden below 640px where the
     header is already tight.
+  - **Five shipped workflows, written out in full** (`scripts/seed_wizards.py`):
+    *Run a systematic literature review* (6 steps), *Analyse your dataset*,
+    *Understand a paper deeply*, *Write a research proposal* and *Get ready to
+    submit* (5 each) — 26 steps, each with bilingual (en/fa) names, a per-step
+    message cap, and a real `guideline_prompt` that drives the agent through the
+    app's actual tools (`screen_abstracts_csv`, `ingest_pdf`, `search_scopus`,
+    `analytics_sandbox`, `validate_references`, `compile_paper`, …). Until now
+    the product shipped with an empty catalogue and every demo needed a wizard
+    authored by hand first.
+    - Idempotent, matched by slug: missing wizards are created, existing ones
+      have their presentation fields refreshed, and **their steps are left
+      alone** so an admin's edits in the editor always win. `--replace-steps`
+      rewrites them, but is refused for any wizard with runs — a live run must
+      never lose the step it is sitting on.
+    - Unpublished by default (`--publish` to list them on the landing page), so
+      the content can be reviewed in the editor before users see it.
+  - **Bulk step authoring — paste an outline, get the steps.** An admin knows a
+    workflow's shape ("screen, ingest, plan, draft") before they know what each
+    step should say, but the editor only offered the full single-step form,
+    repeated. **Add many…** takes an outline — one step name per line — and
+    appends the whole sequence in order.
+    - `POST /admin/wizards/{id}/steps/bulk` (`StepBulkCreate`) with the outline,
+      one shared `max_messages`, and an optional `guideline_template`.
+    - Parsing is the pure `parse_step_outline`: it skips blank lines, strips
+      pasted list markers (`1.`, `2)`, `-`, `*`, `•`), splits `English | فارسی`
+      into both name columns and mirrors a one-sided name into the other, and
+      substitutes `{name}` into the guideline template *literally* (`str.format`
+      would raise on a brace in the prompt text). An empty outline or more than
+      `MAX_OUTLINE_STEPS` (50) is a **400** — never a silent truncation.
+      Unit-tested offline in `tests/test_wizard.py`.
+    - `create_steps` writes them in **one transaction**, so a wizard is never
+      left holding half an outline; positions continue from the existing steps
+      (the append position is now the shared `_append_position`).
+    - Each step lands with a placeholder prompt naming it, which is exactly the
+      part the admin then writes per step — the editor says so under the field.
+  - **File upload in the runner.** A workflow that says "upload your CSV of
+    abstracts" had nowhere to upload it: the runner had no attach control, even
+    though a run is backed by a real `ChatSession` and `POST /upload` +
+    `GET /sessions/{id}/files` have always accepted it. Frontend-only fix — a
+    paperclip in the composer and drag-and-drop anywhere over the runner, both
+    posting to the run's `session_id`.
+    - Uploaded files show as chips above the composer and are **re-loaded when a
+      run is resumed** (`SessionManager.get_files` rehydrates from
+      `data/<session_id>/`, so they outlive a browser session or a restart).
+    - PDFs are ingested into the vector store by the upload endpoint as usual;
+      per-file failures are surfaced rather than swallowed, since a PDF whose
+      text can't be extracted still uploads "successfully".
+    - Nothing is said in the transcript: the agent already sees the session's
+      files through `build_session_context` on the next turn. Attaching stays
+      enabled while the agent is replying for the same reason — the file is only
+      read on the following turn, so there is no race.
   - **Wallet balance in the runner header.** A run spends the same credit as the
     chat screen, so the remaining balance is now visible where it is being spent.
     Seeded from the stored user (paints on the first frame), confirmed once via

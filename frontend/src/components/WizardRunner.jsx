@@ -44,8 +44,19 @@ export default function WizardRunner({ runId }) {
     return typeof b === "number" ? b : null;
   });
 
+  // Files uploaded into this run. They live on the run's backing ChatSession,
+  // so the agent picks them up through the per-turn context without the
+  // transcript having to mention them.
+  const [files, setFiles] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [dragging, setDragging] = useState(false);
+
   const endRef = useRef(null);
   const taRef = useRef(null);
+  const fileRef = useRef(null);
+  // Drag events fire per child element; count enter/leave to know when the
+  // pointer has really left the drop zone.
+  const dragDepth = useRef(0);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -68,6 +79,14 @@ export default function WizardRunner({ runId }) {
       setMessages(
         (data.messages || []).map((m) => ({ role: m.role, content: m.content }))
       );
+      // Files outlive the browser session (they're on disk under the run's
+      // session), so a resumed run has to load them, not just track uploads.
+      try {
+        const listed = await api.listFiles(data.session_id);
+        setFiles(listed.files || []);
+      } catch {
+        /* non-fatal: the run still works without the file strip */
+      }
     } catch (e) {
       setError(e.message);
     } finally {
@@ -156,6 +175,50 @@ export default function WizardRunner({ runId }) {
     }
   }
 
+  // Upload into the run's backing session. PDFs are ingested into the vector
+  // store server-side, CSVs are just stored — both then show up in the agent's
+  // per-turn context, so nothing needs to be said in the chat.
+  async function uploadFiles(fileList) {
+    const chosen = Array.from(fileList || []);
+    if (!chosen.length || uploading || !run?.session_id) return;
+    setUploading(true);
+    setError("");
+    try {
+      const res = await api.uploadFiles(chosen, run.session_id);
+      const listed = await api.listFiles(run.session_id);
+      setFiles(listed.files || []);
+      // Per-file results: a PDF whose text couldn't be extracted still uploads.
+      const failed = (res.files || []).filter((f) => f.status === "error");
+      if (failed.length) {
+        setError(failed.map((f) => `${f.filename}: ${f.message}`).join(" · "));
+      }
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = ""; // re-picking the same file must fire
+    }
+  }
+
+  function onDragEnter(e) {
+    if (!Array.from(e.dataTransfer?.types || []).includes("Files")) return;
+    e.preventDefault();
+    dragDepth.current += 1;
+    setDragging(true);
+  }
+
+  function onDragLeave() {
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setDragging(false);
+  }
+
+  function onDrop(e) {
+    e.preventDefault();
+    dragDepth.current = 0;
+    setDragging(false);
+    if (!attachDisabled) uploadFiles(e.dataTransfer?.files);
+  }
+
   async function requestSuggestions() {
     if (suggesting) return;
     setSuggesting(true);
@@ -216,9 +279,31 @@ export default function WizardRunner({ runId }) {
   const done = run?.status === "completed";
   const abandoned = run?.status === "abandoned";
   const composerDisabled = loading || !!interrupt || done || abandoned;
+  // Attaching stays available while the agent is mid-reply — the file is only
+  // read on the *next* turn, so there is nothing to race.
+  const attachDisabled = uploading || done || abandoned || !run?.session_id;
 
   return (
-    <div className="wz-runner">
+    <div
+      className="wz-runner"
+      onDragEnter={onDragEnter}
+      onDragOver={(e) => {
+        // Without preventDefault on dragover the browser never fires drop.
+        if (Array.from(e.dataTransfer?.types || []).includes("Files")) {
+          e.preventDefault();
+        }
+      }}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
+      {dragging && !attachDisabled && (
+        <div className="wz-dropzone" role="status">
+          <Icon name="paperclip" size={26} />
+          <strong>{t("runner.dropHere")}</strong>
+          <span>{t("runner.attachHint")}</span>
+        </div>
+      )}
+
       <header className="wz-topbar">
         <button className="wz-back" onClick={() => navigate("/runs")}>
           <Icon name="arrow" size={16} className="wz-back-arrow" />
@@ -317,6 +402,8 @@ export default function WizardRunner({ runId }) {
               />
             )}
 
+            {uploading && <div className="typing">{t("runner.uploading")}</div>}
+
             {loading && <div className="typing">{t("runner.thinking")}</div>}
 
             {done && (
@@ -345,6 +432,16 @@ export default function WizardRunner({ runId }) {
 
       {!done && !abandoned && (
         <div className="composer wz-composer">
+          {files.length > 0 && (
+            <ul className="wz-files" aria-label={t("runner.filesLabel")}>
+              {files.map((f) => (
+                <li key={f.path} className="wz-file" title={f.path}>
+                  <Icon name={f.type === "csv" ? "chart" : "document"} size={14} />
+                  <span className="wz-file-name">{f.filename}</span>
+                </li>
+              ))}
+            </ul>
+          )}
           <SuggestedQuestions
             suggestions={suggestions}
             loading={suggesting}
@@ -354,6 +451,24 @@ export default function WizardRunner({ runId }) {
             onDismiss={() => setSuggestions([])}
           />
           <div className="composer-inner">
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              accept=".pdf,.csv"
+              className="wz-file-input"
+              onChange={(e) => uploadFiles(e.target.files)}
+            />
+            <button
+              type="button"
+              className="wz-attach"
+              onClick={() => fileRef.current?.click()}
+              disabled={attachDisabled}
+              aria-label={t("runner.attach")}
+              title={t("runner.attachHint")}
+            >
+              <Icon name="paperclip" size={18} />
+            </button>
             <textarea
               ref={taRef}
               rows={1}

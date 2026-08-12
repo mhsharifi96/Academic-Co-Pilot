@@ -84,6 +84,9 @@ PaperAgent/
 │   ├── run_all.py                # stdlib-only fallback runner
 │   ├── test_hitl.py, test_sessions.py, test_drafter_data.py
 │
+├── scripts/                      # One-off operational scripts (not imported by the app)
+│   └── seed_wizards.py           # Seeds the five shipped guided workflows (idempotent, --publish)
+│
 ├── data/                         # Uploaded PDFs/CSVs (gitignored content)
 ├── output_figures/              # Sandbox-generated charts (.png)
 ├── skills.md                     # Tool catalog injected into the agent system prompt
@@ -100,6 +103,7 @@ PaperAgent/
 - **New DB model:** add to `app/models/`, ensure it's imported so `Base.metadata.create_all` (in `init_models`) picks it up.
 - **New env var:** add to `Settings` in `app/core/config.py` and to `.env.example`.
 - **PDF download queue:** scheduling/quota/fairness/retry rules are pure functions in `app/services/download_service.py` (unit-tested in `tests/test_downloads.py`); the background loop is `app/core/download_worker.py`. Keep the provider token backend-only.
+- **Shipped wizard content:** edit `scripts/seed_wizards.py` and re-run it (`--replace-steps` to overwrite steps of wizards nobody has run yet). It is content, not schema — run it with the repo root on `PYTHONPATH`, e.g. `docker exec -w /app -e PYTHONPATH=/app paper_agent_app python scripts/seed_wizards.py --publish`.
 - **Wizards:** the step state machine lives in pure functions in `app/services/wizard_service.py` (unit-tested in `tests/test_wizard.py`) — change `apply_turn` there, not in the endpoint. A wizard run is backed by a `ChatSession` with `agent_type="wizard"`; that thread must only be advanced through `/wizard-runs/{id}/messages` (`POST /chat` and `DELETE /sessions/{id}` 409 on it).
 - **New UI string:** add the key to both `en` and `fa` in `frontend/src/i18n.js` and read it with `useT()`. New CSS for the wizard surface must use logical properties (`margin-inline`, `text-align: start`) so it mirrors under `dir="rtl"` without an override.
 - **New frontend page:** add a case to `parseRoute` in `frontend/src/router.js` and a branch in `App`'s router shell — above the auth gate if it should be public.

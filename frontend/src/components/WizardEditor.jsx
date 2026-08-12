@@ -10,6 +10,21 @@ const EMPTY_STEP = {
   max_messages: "",
 };
 
+const EMPTY_BULK = { outline: "", max_messages: "" };
+
+// Mirrors `wizard_service.parse_step_outline`: blank lines are skipped and a
+// pasted list marker ("1.", "2)", "-", "*", "•") is not part of the name. Used
+// only to label the button with the number of steps about to be created — the
+// server does the real parsing.
+const OUTLINE_MARKER = /^\s*(?:\d+\s*[.)\]]|[-*•–—])\s*/;
+
+function outlineNames(text) {
+  return (text || "")
+    .split("\n")
+    .map((line) => line.replace(OUTLINE_MARKER, "").trim())
+    .filter(Boolean);
+}
+
 function Field({ label, hint, children }) {
   return (
     <label className="wz-field">
@@ -32,6 +47,7 @@ export default function WizardEditor({ wizardId, onClose, onSaved }) {
   const [wizard, setWizard] = useState(null);
   const [steps, setSteps] = useState([]);
   const [draftStep, setDraftStep] = useState(null); // EMPTY_STEP | null
+  const [bulk, setBulk] = useState(null); // EMPTY_BULK | null
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -100,6 +116,23 @@ export default function WizardEditor({ wizardId, onClose, onSaved }) {
     }
   }
 
+  // One request for the whole outline: the server appends the steps in order
+  // and either creates all of them or none.
+  async function addSteps() {
+    setError("");
+    try {
+      const created = await api.adminCreateSteps(wizardId, {
+        outline: bulk.outline,
+        max_messages: capOf(bulk.max_messages),
+      });
+      setSteps((prev) => [...prev, ...created]);
+      setBulk(null);
+      onSaved?.();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   async function saveStep(step) {
     setError("");
     try {
@@ -146,6 +179,8 @@ export default function WizardEditor({ wizardId, onClose, onSaved }) {
   function patchStep(id, field, value) {
     setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, [field]: value } : s)));
   }
+
+  const bulkCount = bulk ? outlineNames(bulk.outline).length : 0;
 
   if (loading) return <p className="wz-muted">{t("common.loading")}</p>;
   if (!wizard) return <div className="banner-error">⚠️ {error || "Not found"}</div>;
@@ -254,7 +289,7 @@ export default function WizardEditor({ wizardId, onClose, onSaved }) {
 
       <h3 className="wz-section-title small">{t("admin.steps")}</h3>
 
-      {steps.length === 0 && !draftStep && (
+      {steps.length === 0 && !draftStep && !bulk && (
         <p className="wz-muted">{t("admin.noSteps")}</p>
       )}
 
@@ -385,10 +420,54 @@ export default function WizardEditor({ wizardId, onClose, onSaved }) {
             </button>
           </div>
         </div>
+      ) : bulk ? (
+        <div className="wz-step-card">
+          <Field label={t("admin.bulkOutline")} hint={t("admin.bulkOutlineHint")}>
+            <textarea
+              className="wz-outline-input"
+              rows={8}
+              autoFocus
+              placeholder={t("admin.bulkPlaceholder")}
+              value={bulk.outline}
+              onChange={(e) => setBulk({ ...bulk, outline: e.target.value })}
+            />
+          </Field>
+          <Field label={t("admin.bulkCap")} hint={t("admin.bulkCapHint")}>
+            <input
+              type="number"
+              min="1"
+              value={bulk.max_messages}
+              onChange={(e) => setBulk({ ...bulk, max_messages: e.target.value })}
+            />
+          </Field>
+          <p className="wz-field-hint">{t("admin.bulkPromptNote")}</p>
+          <div className="wz-step-actions">
+            <button className="wz-btn ghost small" onClick={() => setBulk(null)}>
+              {t("common.cancel")}
+            </button>
+            <button
+              className="wz-btn primary small"
+              onClick={addSteps}
+              disabled={bulkCount === 0}
+            >
+              {bulkCount === 0
+                ? t("admin.bulkCreateEmpty")
+                : t("admin.bulkCreate", { n: bulkCount })}
+            </button>
+          </div>
+        </div>
       ) : (
-        <button className="wz-btn ghost" onClick={() => setDraftStep({ ...EMPTY_STEP })}>
-          + {t("admin.addStep")}
-        </button>
+        <div className="wz-step-add">
+          <button
+            className="wz-btn ghost"
+            onClick={() => setDraftStep({ ...EMPTY_STEP })}
+          >
+            + {t("admin.addStep")}
+          </button>
+          <button className="wz-btn ghost" onClick={() => setBulk({ ...EMPTY_BULK })}>
+            + {t("admin.addManySteps")}
+          </button>
+        </div>
       )}
     </div>
   );

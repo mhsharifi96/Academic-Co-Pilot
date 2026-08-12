@@ -103,6 +103,80 @@ def slugify(raw: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
+# Pure helpers — bulk step authoring
+# --------------------------------------------------------------------------- #
+# An admin usually knows the shape of a workflow ("screen, ingest, plan, draft")
+# before they know what each step should say. ``parse_step_outline`` turns that
+# outline into step rows in one action; the guideline prompts are placeholders
+# the admin refines afterwards in the editor.
+MAX_OUTLINE_STEPS = 50
+
+# ``{name}`` is substituted with the step's name. Deliberately generic: it must
+# read as a prompt that still needs writing, not as a finished one.
+DEFAULT_GUIDELINE_TEMPLATE = (
+    "Guide the user through this step of the workflow: {name}. "
+    "Stay on this step until its goal is met."
+)
+
+# Leading list markers people paste from a document: "1.", "2)", "-", "*", "•".
+_OUTLINE_MARKER = re.compile(r"^\s*(?:\d+\s*[.)\]]|[-*•–—])\s*")
+
+
+def parse_step_outline(
+    outline: str,
+    *,
+    guideline_template: str = "",
+    max_messages: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Turn a pasted outline into ``create_step`` keyword dicts, in order.
+
+    One step per line. Blank lines are skipped and list markers are stripped, so
+    a numbered list pasted from a document works as-is. A line may name the step
+    in both languages by splitting on ``|`` (``English | فارسی``); with one side
+    only, that text is used for both — ``localized`` would fall back to it
+    anyway, and it keeps the editor's two name fields populated.
+
+    ``guideline_template`` (``{name}`` substituted) fills the required
+    ``guideline_prompt``; blank means ``DEFAULT_GUIDELINE_TEMPLATE``.
+
+    Raises ``ValueError`` if nothing usable is left or there are more than
+    ``MAX_OUTLINE_STEPS`` lines — both are 400s, not silent truncation.
+    """
+    template = (guideline_template or "").strip() or DEFAULT_GUIDELINE_TEMPLATE
+
+    specs: List[Dict[str, Any]] = []
+    for raw_line in (outline or "").splitlines():
+        line = _OUTLINE_MARKER.sub("", raw_line).strip()
+        if not line:
+            continue
+        english, _, farsi = line.partition("|")
+        name_en = english.strip()
+        name_fa = farsi.strip()
+        # One-sided input names the step in both columns rather than leaving a
+        # blank the admin has to notice later.
+        name_en = name_en or name_fa
+        name_fa = name_fa or name_en
+        specs.append(
+            {
+                "name_en": name_en,
+                "name_fa": name_fa,
+                # ``str.format`` would blow up on any other brace in the text.
+                "guideline_prompt": template.replace("{name}", name_en),
+                "max_messages": max_messages,
+            }
+        )
+
+    if not specs:
+        raise ValueError("The outline has no steps — write one step per line.")
+    if len(specs) > MAX_OUTLINE_STEPS:
+        raise ValueError(
+            f"Too many steps: {len(specs)} (the limit is {MAX_OUTLINE_STEPS})."
+        )
+    return specs
+
+
+# --------------------------------------------------------------------------- #
 # Pure helpers — step ordering
 # --------------------------------------------------------------------------- #
 def _sort_key(step: Any):
@@ -739,6 +813,15 @@ async def delete_wizard(db: AsyncSession, wizard_id: str) -> bool:
     return True
 
 
+async def _append_position(db: AsyncSession, wizard_id: str) -> int:
+    """The position a step appended to ``wizard_id`` should take."""
+    result = await db.execute(
+        select(func.max(WizardStep.position)).where(WizardStep.wizard_id == wizard_id)
+    )
+    highest = result.scalar_one_or_none()
+    return 0 if highest is None else int(highest) + 1
+
+
 async def create_step(
     db: AsyncSession, wizard_id: str, **fields: Any
 ) -> Optional[WizardStep]:
@@ -746,18 +829,36 @@ async def create_step(
     if wizard is None:
         return None
     if fields.get("position") is None:
-        result = await db.execute(
-            select(func.max(WizardStep.position)).where(
-                WizardStep.wizard_id == wizard_id
-            )
-        )
-        highest = result.scalar_one_or_none()
-        fields["position"] = 0 if highest is None else int(highest) + 1
+        fields["position"] = await _append_position(db, wizard_id)
     step = WizardStep(wizard_id=wizard_id, **fields)
     db.add(step)
     await db.commit()
     await db.refresh(step)
     return step
+
+
+async def create_steps(
+    db: AsyncSession, wizard_id: str, specs: Sequence[Dict[str, Any]]
+) -> Optional[List[WizardStep]]:
+    """
+    Append several steps in one transaction, keeping the order given.
+
+    All-or-nothing: one commit, so a wizard is never left with half an outline.
+    Positions continue from the wizard's existing steps.
+    """
+    wizard = await db.get(Wizard, wizard_id)
+    if wizard is None:
+        return None
+    position = await _append_position(db, wizard_id)
+    created: List[WizardStep] = []
+    for offset, spec in enumerate(specs):
+        step = WizardStep(wizard_id=wizard_id, position=position + offset, **spec)
+        db.add(step)
+        created.append(step)
+    await db.commit()
+    for step in created:
+        await db.refresh(step)
+    return created
 
 
 async def update_step(

@@ -77,6 +77,9 @@ const PATHS = {
     </>
   ),
   close: <path d="m6 6 12 12M18 6 6 18" />,
+  paperclip: (
+    <path d="M20.5 11.5 12 20a5 5 0 0 1-7-7l8.5-8.5a3.5 3.5 0 0 1 5 5L10 18a2 2 0 0 1-3-3l8-8" />
+  ),
   plus: <path d="M12 5v14M5 12h14" />,
   send: <path d="M4.5 12 20 4.5 15.5 20l-3.6-5.9L4.5 12z" />,
   chevronDown: <path d="m6 9.5 6 6 6-6" />,

@@ -347,13 +347,22 @@ UI: `AdminPage.jsx`.
   the workflow moves on; a **Finish step** control to move on early; an inline
   card when the agent reports the step's goal met (offered, never automatic);
   a **wallet chip** in the header with the remaining USD balance, updated from
-  every billed reply and red once exhausted; and a completion panel when the
-  last step is done.
+  every billed reply and red once exhausted; **file upload** (paperclip in the
+  composer or drag-and-drop over the runner, PDFs ingested on arrival, files
+  listed above the composer and restored when the run is resumed); and a
+  completion panel when the last step is done.
 - **My workflows** — in-progress and finished runs, with Continue.
 - **Language toggle (EN / فا)** — switches UI strings, the language the wizard API
   resolves content for, and `<html dir>`.
 - **Wizard admin** — create/publish/delete workflows and edit their steps
-  (bilingual fields side by side, guideline prompt, message cap, reordering).
+  (bilingual fields side by side, guideline prompt, message cap, reordering),
+  plus **Add many…** — paste an outline, one step name per line, and get the
+  whole sequence created in order in a single request.
+- **Five shipped workflows** (`scripts/seed_wizards.py`, idempotent): *Run a
+  systematic literature review* (6 steps), *Analyse your dataset*, *Understand a
+  paper deeply*, *Write a research proposal*, *Get ready to submit* (5 steps
+  each) — bilingual throughout, each step carrying a written guideline prompt
+  that drives the agent through the real tools.
 - **Guidelines page** — in-app usage guidance.
 - **Admin page** — user/balance management for admins.
 - **Balance indicator** in the top bar.
@@ -399,6 +408,7 @@ UI: `AdminPage.jsx`.
 | `GET|POST /api/v1/admin/wizards` | *(admin)* List all wizards / create one |
 | `GET|PATCH|DELETE /api/v1/admin/wizards/{id}` | *(admin)* Read / edit / delete (409 once runs exist) |
 | `POST /api/v1/admin/wizards/{id}/steps` | *(admin)* Append a step |
+| `POST /api/v1/admin/wizards/{id}/steps/bulk` | *(admin)* Append a whole outline (one step per line) |
 | `PATCH|DELETE /api/v1/admin/wizard-steps/{id}` | *(admin)* Edit / delete a step |
 | `PUT /api/v1/admin/wizards/{id}/steps/reorder` | *(admin)* Rewrite step order |
 
