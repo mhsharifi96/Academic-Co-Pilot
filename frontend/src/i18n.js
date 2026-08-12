@@ -97,6 +97,8 @@ const STRINGS = {
     "runner.suggestGo": "Next step",
     "runner.welcome": "Send a message to begin.",
     "runner.loading": "Loading your workflow…",
+    "runner.balance": "Wallet",
+    "runner.balanceHint": "Credit left in your wallet. Each message you send is billed to it.",
 
     "runs.title": "My workflows",
     "runs.subtitle": "Pick up where you left off.",
@@ -242,6 +244,8 @@ const STRINGS = {
     "runner.suggestGo": "گام بعد",
     "runner.welcome": "برای شروع پیامی بفرستید.",
     "runner.loading": "در حال بارگذاری مسیر…",
+    "runner.balance": "کیف پول",
+    "runner.balanceHint": "اعتبار باقی‌ماندهٔ کیف پول شما. هزینهٔ هر پیامی که می‌فرستید از آن کم می‌شود.",
 
     "runs.title": "مسیرهای من",
     "runs.subtitle": "از همان‌جا که رها کردید ادامه دهید.",

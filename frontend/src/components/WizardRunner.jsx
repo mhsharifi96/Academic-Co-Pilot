@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as api from "../api.js";
+import * as auth from "../auth.js";
 import { useT } from "../i18n.js";
 import { navigate } from "../router.js";
 import InterruptCard from "./InterruptCard.jsx";
@@ -35,6 +36,13 @@ export default function WizardRunner({ runId }) {
   const [loading, setLoading] = useState(false);
   const [booting, setBooting] = useState(true);
   const [error, setError] = useState("");
+  // Remaining credit (USD). Seeded from the stored user so the chip paints on
+  // the first frame, then refreshed from the server. `null` means billing is
+  // off (the API returns no balance) — the chip stays hidden.
+  const [balance, setBalance] = useState(() => {
+    const b = auth.getUser()?.balance;
+    return typeof b === "number" ? b : null;
+  });
 
   const endRef = useRef(null);
   const taRef = useRef(null);
@@ -71,9 +79,37 @@ export default function WizardRunner({ runId }) {
     load();
   }, [load]);
 
+  // The stored balance can be stale (other tabs, admin top-ups), so confirm it
+  // once when the run opens. Non-fatal if it fails — the seed value stands.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const me = await api.fetchMe();
+        if (cancelled || !me) return;
+        auth.setUser(me);
+        if (typeof me.balance === "number") setBalance(me.balance);
+      } catch {
+        /* keep the seeded value */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Every billed response carries the balance left after it was charged; mirror
+  // it into the stored user so the chat screen's chip agrees.
+  function applyBalance(value) {
+    if (typeof value !== "number") return;
+    setBalance(value);
+    auth.patchUser({ balance: value });
+  }
+
   // Fold a turn response back into local state: transcript, step position, and
   // the "you've moved on" notice.
   function applyTurn(res, sentText) {
+    applyBalance(res.balance);
     if (sentText != null) {
       setMessages((prev) => [...prev, { role: "user", content: sentText }]);
     }
@@ -126,6 +162,7 @@ export default function WizardRunner({ runId }) {
     setError("");
     try {
       const res = await api.suggestWizardQuestions(runId, lang);
+      applyBalance(res.balance);
       setSuggestions(res.suggestions || []);
       if (!(res.suggestions || []).length) setError(t("suggest.empty"));
     } catch (e) {
@@ -189,6 +226,15 @@ export default function WizardRunner({ runId }) {
         </button>
         <span className="wz-runner-title">{run?.wizard_title || ""}</span>
         <div className="wz-topbar-actions">
+          {balance !== null && (
+            <span
+              className={`user-balance wz-balance${balance <= 0 ? " empty" : ""}`}
+              title={t("runner.balanceHint")}
+            >
+              <span className="wz-balance-label">{t("runner.balance")}</span>
+              <span className="wz-balance-value">${balance.toFixed(3)}</span>
+            </span>
+          )}
           <LangToggle compact />
           {!done && !abandoned && (
             <button className="wz-btn ghost small" onClick={discard}>

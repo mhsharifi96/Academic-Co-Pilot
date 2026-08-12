@@ -307,7 +307,8 @@ Each account carries a USD `balance` (default `$0.50`, `DEFAULT_USER_BALANCE`).
 Every chat/resume turn measures its token usage, converts it to a dollar cost
 (`COST_INPUT_PER_1M` / `COST_OUTPUT_PER_1M`), deducts it from the user, and
 writes an audit row to `usage_records`. The remaining balance is returned on
-every `ChatResponse` and shown live in the top bar. A user at or below
+every `ChatResponse` — and on every wizard turn/resume/suggestions response —
+and shown live in both the chat top bar and the wizard runner header. A user at or below
 `MIN_BALANCE_TO_CHAT` is blocked with **HTTP 402** until topped up. Admins are
 never blocked. Disable metering entirely with `ENABLE_BILLING=false`.
 
@@ -345,7 +346,9 @@ UI: `AdminPage.jsx`.
   a progress bar, the current step's name, and how many messages remain before
   the workflow moves on; a **Finish step** control to move on early; an inline
   card when the agent reports the step's goal met (offered, never automatic);
-  and a completion panel when the last step is done.
+  a **wallet chip** in the header with the remaining USD balance, updated from
+  every billed reply and red once exhausted; and a completion panel when the
+  last step is done.
 - **My workflows** — in-progress and finished runs, with Continue.
 - **Language toggle (EN / فا)** — switches UI strings, the language the wizard API
   resolves content for, and `<html dir>`.

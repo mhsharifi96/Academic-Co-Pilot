@@ -1619,6 +1619,34 @@ html[dir="rtl"] {
   gap: var(--space-2);
 }
 
+/* Wallet chip. Inherits the colours of the chat screen's `.user-balance`
+   (green, red once exhausted) and only adds the label + runner spacing. */
+.wz-balance {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+.wz-balance-label {
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  opacity: 0.8;
+}
+.wz-balance-value {
+  font-variant-numeric: tabular-nums;
+  /* The amount stays LTR even in the Persian (RTL) layout. */
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+@media (max-width: 640px) {
+  .wz-balance-label {
+    display: none;
+  }
+}
+
 /* ---------- Buttons ---------- */
 .wz-btn {
   display: inline-flex;

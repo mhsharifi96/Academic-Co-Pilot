@@ -119,6 +119,15 @@ authentication and persistence layer on top of the original agent MVP:
   - **The Finish control names its destination** ("Next: screen results"), so
     ending a step is a decision rather than a leap. Hidden below 640px where the
     header is already tight.
+  - **Wallet balance in the runner header.** A run spends the same credit as the
+    chat screen, so the remaining balance is now visible where it is being spent.
+    Seeded from the stored user (paints on the first frame), confirmed once via
+    `GET /auth/me` when the run opens, and updated from the `balance` every
+    billed response already carries — turns, resumes and suggestions — with no
+    extra request and no backend change. Turning red at zero mirrors
+    `.user-balance` in the chat top bar, and the update is written back through
+    `auth.patchUser` so both screens agree. The label collapses to the amount
+    below 640px; the amount stays LTR under the Persian layout.
 - **`feature.md` — complete feature catalogue.** A single document listing every
   user-facing capability grouped by area (the two agents and session binding,
   guardrails and HITL, literature discovery across Scopus/arXiv/Crossref/OpenAlex,
