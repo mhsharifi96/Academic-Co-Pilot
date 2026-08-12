@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import * as api from "../api.js";
 import { useT } from "../i18n.js";
+import SiteSettingsPanel from "./SiteSettingsPanel.jsx";
 import WizardAdminPanel from "./WizardAdminPanel.jsx";
 
-// Admin console, split into tabs: user balances and guided workflows. Only
-// rendered when the logged-in user has is_admin === true (gated in App.jsx /
-// SessionBar).
+// Admin console, split into tabs: user balances, guided workflows, and
+// site-wide switches. Only rendered when the logged-in user has
+// is_admin === true (gated in App.jsx / SessionBar).
 export default function AdminPage({ onBack, currentUserId }) {
   const { t } = useT();
-  const [tab, setTab] = useState("users"); // "users" | "wizards"
+  const [tab, setTab] = useState("users"); // "users" | "wizards" | "site"
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -120,10 +121,20 @@ export default function AdminPage({ onBack, currentUserId }) {
           >
             {t("admin.title")}
           </button>
+          <button
+            role="tab"
+            aria-selected={tab === "site"}
+            className={`admin-tab${tab === "site" ? " active" : ""}`}
+            onClick={() => setTab("site")}
+          >
+            Site
+          </button>
         </div>
 
         {tab === "wizards" ? (
           <WizardAdminPanel />
+        ) : tab === "site" ? (
+          <SiteSettingsPanel />
         ) : (
           <>
         <p className="admin-sub">

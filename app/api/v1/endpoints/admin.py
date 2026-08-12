@@ -1,8 +1,9 @@
 """
-Admin endpoints for managing users' balances.
+Admin endpoints for managing users' balances and site-wide settings.
 
 All routes require an admin (``get_current_admin`` → 403 otherwise). Kept small
-and self-contained: list users, adjust a user's balance, and toggle admin.
+and self-contained: list users, adjust a user's balance, toggle admin, and open
+or close public registration.
 """
 
 from datetime import datetime
@@ -16,6 +17,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.security import get_current_admin
 from app.models.auth import User
+from app.services.site_settings_service import (
+    get_site_settings,
+    set_registration_open,
+)
 
 router = APIRouter()
 
@@ -39,6 +44,17 @@ class AdjustBalanceRequest(BaseModel):
     """Add (or subtract, if negative) credit to a user's balance."""
 
     amount: float
+
+
+class SiteSettingsOut(BaseModel):
+    registration_open: bool
+    updated_at: Optional[datetime] = None
+
+
+class UpdateSiteSettingsRequest(BaseModel):
+    """Open or close public sign-up. Optional so the model can grow."""
+
+    registration_open: Optional[bool] = None
 
 
 def _to_out(user: User) -> AdminUserOut:
@@ -88,6 +104,33 @@ async def update_user(
     await db.commit()
     await db.refresh(user)
     return _to_out(user)
+
+
+@router.get("/admin/settings", response_model=SiteSettingsOut)
+async def read_site_settings(
+    _: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    row = await get_site_settings(db)
+    return SiteSettingsOut(
+        registration_open=row.registration_open, updated_at=row.updated_at
+    )
+
+
+@router.patch("/admin/settings", response_model=SiteSettingsOut)
+async def update_site_settings(
+    body: UpdateSiteSettingsRequest,
+    _: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    row = (
+        await set_registration_open(db, body.registration_open)
+        if body.registration_open is not None
+        else await get_site_settings(db)
+    )
+    return SiteSettingsOut(
+        registration_open=row.registration_open, updated_at=row.updated_at
+    )
 
 
 @router.post("/admin/users/{user_id}/adjust-balance", response_model=AdminUserOut)

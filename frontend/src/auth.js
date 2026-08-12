@@ -77,6 +77,19 @@ export async function login(email, password) {
   return data.user;
 }
 
+// Public flags for the signed-out login screen (currently: is sign-up open?).
+// Never throws — a failure just falls back to showing the sign-up option, and
+// the register call itself is the real gate.
+export async function fetchAuthConfig() {
+  try {
+    const res = await fetch("/api/v1/auth/config");
+    if (!res.ok) return { registration_open: true };
+    return await res.json();
+  } catch {
+    return { registration_open: true };
+  }
+}
+
 export async function register(email, password) {
   const data = await post("/auth/register", { email, password });
   store(data.access_token, data.user);

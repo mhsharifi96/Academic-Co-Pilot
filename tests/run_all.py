@@ -57,6 +57,7 @@ TEST_MODULES = [
     "test_reference_checker",
     "test_venue_suggester",
     "test_llm_repo",
+    "test_site_settings",
 ]
 
 

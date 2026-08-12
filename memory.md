@@ -39,6 +39,12 @@ over re-scanning the codebase. For depth see `Design.md`, `PRD.md`,
      added by `init_models` `ALTER ... IF NOT EXISTS`.
    - First account to register becomes admin. Admin API in
      `app/api/v1/endpoints/admin.py` (`get_current_admin`); UI in `AdminPage.jsx`.
+   - **Registration switch:** singleton `site_settings` row (`app/models/site.py`,
+     id `"global"`, inserted lazily on first read). `GET`/`PATCH /admin/settings`
+     flips `registration_open`; public `GET /auth/config` tells the login screen.
+     Closed → register returns 403, **except the very first account** (rule:
+     `registration_allowed` in `app/services/site_settings_service.py`). UI: the
+     **Site** tab of AdminPage (`SiteSettingsPanel.jsx`).
    - Guardrail in `app/agents/guardrails.py` (`screen_message`): keyword rules +
      cheap LLM classifier, runs in the chat endpoint BEFORE the agent, **fails
      open**, blocks off-topic/jailbreak with `status="blocked"` (not billed).

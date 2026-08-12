@@ -300,7 +300,8 @@ section; the deep agent runs the same protocol autonomously.
 JWT bearer auth with bcrypt password hashing (`app/core/security.py`).
 `POST /auth/register`, `POST /auth/login`, `GET /auth/me`. Tokens default to a
 7-day lifetime; the SPA stores the token in localStorage and drops to the login
-screen on any `401` via an `auth:logout` event.
+screen on any `401` via an `auth:logout` event. `GET /auth/config` is public and
+tells the login screen whether sign-up is currently open (see 10.4).
 
 ### 10.2 Per-user balance and usage metering
 Each account carries a USD `balance` (default `$0.50`, `DEFAULT_USER_BALANCE`).
@@ -319,8 +320,26 @@ specific account deterministically at startup). Admin-only endpoints
 - `GET /admin/users` — list users with balance, admin flag, created date.
 - `PATCH /admin/users/{id}` — set a balance outright and/or toggle admin.
 - `POST /admin/users/{id}/adjust-balance` — add or subtract credit.
+- `GET` / `PATCH /admin/settings` — read or flip the site-wide switches (10.4).
 
 UI: `AdminPage.jsx`.
+
+### 10.4 Site settings — open/close user registration
+A singleton `site_settings` row (`app/models/site.py`) holds switches an admin
+can flip at runtime, without a redeploy — unlike `app/core/config.py`, which is
+environment-only. The first switch is `registration_open` (default **true**):
+
+- **Closed** → `POST /auth/register` returns **403**, and the SPA's login screen
+  hides the "Create one" link and explains that sign-up is closed. Logging in,
+  and everything an existing user can do, are unaffected.
+- The **very first account is always allowed through**, even when closed, so a
+  fresh deployment can still bootstrap its admin (the rule is the pure
+  `registration_allowed` in `app/services/site_settings_service.py`, unit-tested
+  in `tests/test_site_settings.py`).
+- The row is inserted lazily on first read, so no seed or migration step is
+  needed; `migrations/20260812_add_site_settings.sql` is a parity file.
+
+UI: the **Site** tab of `AdminPage.jsx` (`SiteSettingsPanel.jsx`).
 
 ---
 
@@ -395,6 +414,9 @@ UI: `AdminPage.jsx`.
 | `GET /api/v1/admin/users` | *(admin)* List users |
 | `PATCH /api/v1/admin/users/{id}` | *(admin)* Set balance / admin flag |
 | `POST /api/v1/admin/users/{id}/adjust-balance` | *(admin)* Add or subtract credit |
+| `GET /api/v1/auth/config` | **Public** — is registration open? |
+| `GET /api/v1/admin/settings` | *(admin)* Read site-wide settings |
+| `PATCH /api/v1/admin/settings` | *(admin)* Open or close user registration |
 | `GET /api/v1/wizards?lang=` | **Public** — published wizards, resolved for `en`/`fa` |
 | `GET /api/v1/wizards/{slug}?lang=` | **Public** — one wizard + its step outline |
 | `POST /api/v1/wizard-runs` | Start a wizard, or resume your active run (returns the transcript) |

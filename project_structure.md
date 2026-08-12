@@ -39,9 +39,11 @@ PaperAgent/
 │   ├── models/
 │   │   ├── auth.py               # ORM: User, ChatSession, UsageRecord
 │   │   ├── downloads.py          # ORM: DownloadJob (PDF download queue)
+│   │   ├── site.py               # ORM: SiteSetting (singleton; registration_open)
 │   │   └── wizard.py             # ORM: Wizard, WizardStep, WizardRun, WizardMessage
 │   ├── services/
 │   │   ├── session_service.py    # ChatSession ownership CRUD
+│   │   ├── site_settings_service.py  # Site switches + registration_allowed (pure fn)
 │   │   ├── wizard_service.py     # Wizard step state machine (pure fns) + DB wrappers
 │   │   └── download_service.py   # Quota/scheduling/fairness/retry (pure fns) + DB wrappers
 │   ├── repositories/             # provider-agnostic external-service seams

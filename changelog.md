@@ -7,6 +7,17 @@ All notable changes to this project. Format loosely follows
 Work in progress on the current branch (`main`) — not yet committed. Adds the
 authentication and persistence layer on top of the original agent MVP:
 ### Added
+- **Admin switch to open or close user registration.** A new singleton
+  `site_settings` row (`app/models/site.py`) holds site-wide switches an admin
+  can flip at runtime — first one is `registration_open` (default open). When
+  closed, `POST /auth/register` returns 403 and the login screen hides the
+  sign-up link; the first-ever account is still allowed through so a fresh
+  deployment can bootstrap its admin. New endpoints: public `GET /auth/config`,
+  admin `GET`/`PATCH /admin/settings`. The rule is the pure
+  `registration_allowed` in `app/services/site_settings_service.py`
+  (`tests/test_site_settings.py`); UI is the **Site** tab of the admin console
+  (`frontend/src/components/SiteSettingsPanel.jsx`). DDL parity:
+  `migrations/20260812_add_site_settings.sql`.
 - **Dynamic wizards — admin-authored guided workflows (en/fa).** Admins define a
   `Wizard` (unique slug, internal `name`, and per-language `title_*` /
   `short_description_*`) with an ordered list of `WizardStep`s; each step carries

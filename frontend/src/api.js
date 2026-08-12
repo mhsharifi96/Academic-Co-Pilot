@@ -259,3 +259,16 @@ export async function adjustBalance(userId, amount) {
     body: { amount },
   });
 }
+
+// ----- Site settings (admin) -----
+
+export async function getSiteSettings() {
+  return request("/admin/settings");
+}
+
+export async function setRegistrationOpen(open) {
+  return request("/admin/settings", {
+    method: "PATCH",
+    body: { registration_open: open },
+  });
+}

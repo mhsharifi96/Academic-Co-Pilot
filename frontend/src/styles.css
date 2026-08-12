@@ -281,6 +281,28 @@ body {
   background: rgba(91, 140, 255, 0.12);
 }
 
+/* One row of the admin "Site" tab: label + hint on the left, switch on the right. */
+.site-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3, 12px);
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.site-setting-text {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+.site-setting-hint {
+  color: var(--muted);
+  font-size: 12px;
+  max-width: 60ch;
+}
+
 .admin-actions {
   display: flex;
   gap: 6px;
@@ -378,6 +400,11 @@ body {
   text-align: center;
   color: var(--muted);
   font-size: 13px;
+}
+
+/* Shown instead of the sign-up link when an admin has closed registration. */
+.login-closed {
+  line-height: 1.5;
 }
 
 .link-btn {

@@ -14,6 +14,10 @@ from app.core.security import (
     verify_password,
 )
 from app.models.auth import User
+from app.services.site_settings_service import (
+    get_site_settings,
+    registration_allowed,
+)
 
 router = APIRouter()
 
@@ -45,6 +49,24 @@ class TokenResponse(BaseModel):
     user: UserOut
 
 
+class AuthConfigOut(BaseModel):
+    """Public flags the login screen needs before anyone is signed in."""
+
+    registration_open: bool
+
+
+@router.get("/auth/config", response_model=AuthConfigOut)
+async def auth_config(db: AsyncSession = Depends(get_db)):
+    """Unauthenticated: tells the UI whether to offer the sign-up form."""
+    settings_row = await get_site_settings(db)
+    user_count = await db.scalar(select(func.count()).select_from(User))
+    return AuthConfigOut(
+        registration_open=registration_allowed(
+            settings_row.registration_open, user_count or 0
+        )
+    )
+
+
 @router.post("/auth/register", response_model=TokenResponse, status_code=201)
 async def register(creds: Credentials, db: AsyncSession = Depends(get_db)):
     existing = await get_user_by_email(db, creds.email)
@@ -58,6 +80,16 @@ async def register(creds: Credentials, db: AsyncSession = Depends(get_db)):
     is_first_user = (
         await db.scalar(select(func.count()).select_from(User))
     ) == 0
+    # Admins can close sign-up site-wide from /admin/settings; the first account
+    # is always allowed through so a fresh deployment can bootstrap its admin.
+    settings_row = await get_site_settings(db)
+    if not registration_allowed(
+        settings_row.registration_open, 0 if is_first_user else 1
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Registration is currently closed. Please contact an administrator.",
+        )
     user = User(
         email=creds.email,
         hashed_password=hash_password(creds.password),

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import * as auth from "../auth.js";
 
 export default function LoginPage({ onAuthed }) {
@@ -7,6 +7,23 @@ export default function LoginPage({ onAuthed }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  // Admins can close sign-up site-wide (GET /auth/config). Assume open until we
+  // know otherwise so the form never flickers between states on a slow network.
+  const [registrationOpen, setRegistrationOpen] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    auth.fetchAuthConfig().then((cfg) => {
+      if (cancelled) return;
+      const open = cfg?.registration_open !== false;
+      setRegistrationOpen(open);
+      // If we were already on the sign-up tab, fall back to logging in.
+      if (!open) setMode("login");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const isRegister = mode === "register";
 
@@ -68,19 +85,26 @@ export default function LoginPage({ onAuthed }) {
           {busy ? "Please wait…" : isRegister ? "Create account" : "Log in"}
         </button>
 
-        <div className="login-toggle">
-          {isRegister ? "Already have an account?" : "New here?"}{" "}
-          <button
-            type="button"
-            className="link-btn"
-            onClick={() => {
-              setError(null);
-              setMode(isRegister ? "login" : "register");
-            }}
-          >
-            {isRegister ? "Log in" : "Create one"}
-          </button>
-        </div>
+        {registrationOpen ? (
+          <div className="login-toggle">
+            {isRegister ? "Already have an account?" : "New here?"}{" "}
+            <button
+              type="button"
+              className="link-btn"
+              onClick={() => {
+                setError(null);
+                setMode(isRegister ? "login" : "register");
+              }}
+            >
+              {isRegister ? "Log in" : "Create one"}
+            </button>
+          </div>
+        ) : (
+          <div className="login-toggle login-closed">
+            New sign-ups are currently closed. Ask an administrator for an
+            account.
+          </div>
+        )}
       </form>
     </div>
   );
