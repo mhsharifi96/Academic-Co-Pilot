@@ -1595,10 +1595,16 @@ html[dir="rtl"] {
     var(--bg);
 }
 
-/* The landing page is a document: it grows and scrolls as a whole. */
+/* The landing page is a document: it grows and scrolls as a whole. It is the
+   scroll container itself (#root is pinned to the viewport height), which is
+   also why `.wz-topbar` can be `position: sticky`.
+   `overflow-x` is pinned to `hidden` on purpose: a lone `overflow-y: auto`
+   computes the other axis to `auto` too, so any decorative bleed — an off-grid
+   glow, a card mid-animation — would hand the page a horizontal scrollbar. */
 .wz-landing {
   min-height: 100dvh;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* The runner is an app shell, and must NOT grow. `height` (not `min-height`)
@@ -1820,8 +1826,13 @@ html[dir="rtl"] .wz-btn:hover .wz-go-arrow {
 .wz-hero-aura {
   position: absolute;
   inset-block-start: -8rem;
-  inset-inline-start: 50%;
-  transform: translateX(-50%);
+  /* Centre it with insets + auto margins, NOT `inset-inline-start: 50%` plus
+     `translateX(-50%)`: the inset is logical and flips under RTL but the
+     transform is physical and does not, so in Persian the glow landed a few
+     hundred pixels past the left edge and gave the whole landing page a
+     horizontal scrollbar for something invisible. */
+  inset-inline: 0;
+  margin-inline: auto;
   width: min(46rem, 90vw);
   height: 26rem;
   background: radial-gradient(closest-side, var(--wz-glow), transparent);
