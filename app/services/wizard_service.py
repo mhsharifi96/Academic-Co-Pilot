@@ -177,6 +177,220 @@ def parse_step_outline(
 
 
 # --------------------------------------------------------------------------- #
+# Pure helpers — AI-drafted wizards
+# --------------------------------------------------------------------------- #
+# An admin describes the workflow they want in plain words and a model drafts
+# the whole thing: bilingual presentation text plus every step's name and
+# guideline prompt. The draft is only a proposal — nothing is saved until the
+# admin reviews it and creates the wizard.
+DRAFT_MIN_STEPS = 2
+DRAFT_MAX_STEPS = 8
+DRAFT_DEFAULT_MAX_MESSAGES = 8
+
+# Must match ``WIZARD_ICON_KEYS`` in ``frontend/src/components/Icon.jsx``.
+WIZARD_ICONS = (
+    "compass", "search", "document", "layers", "chart", "beaker", "quote", "sparkles",
+)
+
+# One real step from ``scripts/seed_wizards.py``: showing the house style works
+# better than describing it.
+_DRAFT_EXAMPLE_STEP = {
+    "name_en": "Verify every citation",
+    "name_fa": "راستی‌آزمایی ارجاع‌ها",
+    "max_messages": 6,
+    "guideline_prompt": (
+        "Goal: no reference in the manuscript that does not exist.\n\n"
+        "Run `validate_references` over the reference list and report the "
+        "outcome honestly: which resolved, which did not, and which resolved to "
+        "something different from what was cited. Use `resolve_citation` to "
+        "repair entries and to fill in missing DOIs.\n\n"
+        "Treat an unresolvable reference as a blocker and say so. Hand back the "
+        "corrected list in the user's citation style."
+    ),
+}
+
+# A backticked snake_case word in a guideline prompt is read as a tool (or tool
+# argument) reference.
+_TOOL_MENTION_RE = re.compile(r"`([a-z][a-z0-9]*(?:_[a-z0-9]+)+)`")
+
+
+@dataclass(frozen=True)
+class WizardDraft:
+    fields: Dict[str, Any]
+    steps: List[Dict[str, Any]]
+    warnings: List[str]
+
+
+def build_wizard_draft_prompt(
+    *,
+    goal: str,
+    audience: str = "",
+    step_count: Optional[int] = None,
+    max_messages: Optional[int] = None,
+    tools: Sequence[tuple] = (),
+) -> str:
+    """
+    Build the prompt asking a model to draft a whole wizard as JSON.
+
+    ``tools`` is ``(signature, one-line description)`` pairs, e.g.
+    ``("search_openalex(query, from_year)", "Search OpenAlex")`` — the agent's
+    real tool set, so the guideline prompts point the agent at tools that exist.
+    """
+    tool_lines = "\n".join(f"- {name}: {desc}" for name, desc in tools)
+    if step_count:
+        steps_rule = f"exactly {step_count} steps"
+    else:
+        steps_rule = (
+            f"between {DRAFT_MIN_STEPS} and {DRAFT_MAX_STEPS} steps — as few as "
+            "the goal allows; each step must end in something concrete"
+        )
+    cap = max_messages or DRAFT_DEFAULT_MAX_MESSAGES
+    audience_line = f"Intended users: {audience.strip()}\n" if audience.strip() else ""
+    example = json.dumps(_DRAFT_EXAMPLE_STEP, ensure_ascii=False, indent=2)
+
+    return (
+        "Design a guided workflow for an academic research assistant. A user "
+        "walks through it step by step in a chat; on each step the assistant "
+        "receives that step's `guideline_prompt` as its instructions.\n\n"
+        f"What the admin wants the workflow to do:\n{goal.strip()}\n"
+        f"{audience_line}\n"
+        f"Write {steps_rule}.\n\n"
+        "Rules for each `guideline_prompt`:\n"
+        "- It is written for the assistant, not shown to the user. Start with "
+        "'Goal: ...' in one sentence, then say what to ask, which tools to use "
+        "and what to hand back at the end of the step.\n"
+        "- Only name tools from the list below, by name only and in backticks "
+        "(e.g. `search_openalex`); mention an argument in backticks when it "
+        "matters (e.g. `from_year`). Never invent a tool.\n"
+        "- Tell the assistant never to invent papers, data or references.\n"
+        "- Keep it cost-aware: few, grouped searches; compact tables; no "
+        "long prose.\n"
+        "- Do not mention the reply language or how to end the step; the "
+        "system adds that.\n"
+        "- 60 to 180 words.\n\n"
+        f"Suggested `max_messages` per step: around {cap} (fewer for simple "
+        "steps, more for drafting steps).\n\n"
+        f"Available tools:\n{tool_lines or '(none)'}\n\n"
+        f"Example of one well-written step:\n{example}\n\n"
+        "Reply with ONLY a JSON object, no prose:\n"
+        "{\n"
+        '  "name": "short internal name, English, lowercase",\n'
+        '  "slug": "latin-letters-and-hyphens",\n'
+        '  "title_en": "...", "title_fa": "...",\n'
+        '  "short_description_en": "one or two sentences",\n'
+        '  "short_description_fa": "...",\n'
+        f'  "icon": "one of: {", ".join(WIZARD_ICONS)}",\n'
+        '  "steps": [{"name_en": "...", "name_fa": "...", '
+        '"guideline_prompt": "...", "max_messages": 8}]\n'
+        "}"
+    )
+
+
+def unknown_tool_mentions(text: str, known: Sequence[str]) -> List[str]:
+    """Backticked snake_case names in ``text`` that are not in ``known``."""
+    known_set = set(known)
+    seen: List[str] = []
+    for name in _TOOL_MENTION_RE.findall(text or ""):
+        if name not in known_set and name not in seen:
+            seen.append(name)
+    return seen
+
+
+def _clean_cap(value: Any, default: Optional[int]) -> Optional[int]:
+    try:
+        cap = int(value)
+    except (TypeError, ValueError):
+        return default
+    return cap if 1 <= cap <= 50 else default
+
+
+def parse_wizard_draft(
+    raw: str,
+    *,
+    known_names: Sequence[str] = (),
+    default_max_messages: Optional[int] = DRAFT_DEFAULT_MAX_MESSAGES,
+) -> WizardDraft:
+    """
+    Parse the model's JSON reply into a reviewable draft.
+
+    Tolerates code fences and surrounding prose. Fills gaps instead of failing
+    (a missing Persian name falls back to the English one, an unknown icon to
+    ``compass``) and reports problems the admin should look at as ``warnings``
+    — chiefly guideline prompts that name tools the agent does not have.
+
+    Raises ``ValueError`` when no usable step is left.
+    """
+    text = (raw or "").strip()
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    try:
+        data = json.loads(match.group(0)) if match else None
+    except (ValueError, TypeError):
+        data = None
+    if not isinstance(data, dict):
+        raise ValueError("The model did not return a usable draft; try again.")
+
+    def s(key: str) -> str:
+        return str(data.get(key, "") or "").strip()
+
+    warnings: List[str] = []
+    steps: List[Dict[str, Any]] = []
+    for item in data.get("steps") or []:
+        if not isinstance(item, dict):
+            continue
+        prompt = str(item.get("guideline_prompt", "") or "").strip()
+        name_en = str(item.get("name_en", "") or "").strip()
+        name_fa = str(item.get("name_fa", "") or "").strip()
+        if not prompt or not (name_en or name_fa):
+            continue
+        name_en = name_en or name_fa
+        name_fa = name_fa or name_en
+        steps.append(
+            {
+                "name_en": name_en,
+                "name_fa": name_fa,
+                "guideline_prompt": prompt,
+                "max_messages": _clean_cap(item.get("max_messages"), default_max_messages),
+            }
+        )
+        if known_names:
+            for tool in unknown_tool_mentions(prompt, known_names):
+                warnings.append(f'Step "{name_en}" mentions an unknown tool `{tool}`.')
+        if len(steps) == DRAFT_MAX_STEPS:
+            break
+
+    if not steps:
+        raise ValueError("The draft has no usable steps; try again or add detail.")
+
+    title_en = s("title_en")
+    name = s("name") or title_en or "new workflow"
+    icon = s("icon")
+    fields = {
+        "name": name[:200],
+        "slug": slugify(s("slug") or name),
+        "title_en": title_en,
+        "title_fa": s("title_fa"),
+        "short_description_en": s("short_description_en"),
+        "short_description_fa": s("short_description_fa"),
+        "icon": icon if icon in WIZARD_ICONS else "compass",
+    }
+    if not fields["title_fa"] or not fields["short_description_fa"]:
+        warnings.append("The Persian title or description is missing.")
+    return WizardDraft(fields=fields, steps=steps, warnings=warnings)
+
+
+def unique_slug(slug: str, taken: Sequence[str]) -> str:
+    """``slug``, or ``slug-2``, ``slug-3``… — the first not in ``taken``."""
+    base = slug or "workflow"
+    taken_set = set(taken)
+    if base not in taken_set:
+        return base
+    n = 2
+    while f"{base}-{n}" in taken_set:
+        n += 1
+    return f"{base}-{n}"
+
+
+# --------------------------------------------------------------------------- #
 # Pure helpers — step ordering
 # --------------------------------------------------------------------------- #
 def _sort_key(step: Any):
@@ -771,9 +985,25 @@ async def slug_exists(
     return int(result.scalar_one() or 0) > 0
 
 
-async def create_wizard(db: AsyncSession, **fields: Any) -> Wizard:
+async def slugs_starting_with(db: AsyncSession, prefix: str) -> List[str]:
+    """Existing slugs that start with ``prefix`` — input for ``unique_slug``."""
+    result = await db.execute(select(Wizard.slug).where(Wizard.slug.startswith(prefix)))
+    return [row[0] for row in result.all()]
+
+
+async def create_wizard(
+    db: AsyncSession,
+    *,
+    steps: Sequence[Dict[str, Any]] = (),
+    **fields: Any,
+) -> Wizard:
+    """Create a wizard, and optionally its steps in order, in one commit."""
     wizard = Wizard(**fields)
     db.add(wizard)
+    if steps:
+        await db.flush()  # need the id for the steps
+        for position, spec in enumerate(steps):
+            db.add(WizardStep(wizard_id=wizard.id, position=position, **spec))
     await db.commit()
     await db.refresh(wizard)
     return wizard

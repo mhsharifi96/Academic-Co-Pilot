@@ -190,6 +190,41 @@ class WizardCreate(BaseModel):
     position: int = 0
     is_published: bool = False
     enforce_scope_guardrail: bool = True
+    # Optional initial steps, created in order in the same transaction — how an
+    # AI draft (``WizardDraftOut``) is saved after the admin has reviewed it.
+    steps: List["StepCreate"] = Field(default_factory=list, max_length=50)
+
+
+class WizardDraftRequest(BaseModel):
+    """What the admin wants a new workflow to do, in their own words."""
+
+    goal: str = Field(min_length=10, max_length=4000)
+    audience: str = Field(default="", max_length=500)
+    # Blank lets the model choose; otherwise the exact number of steps.
+    step_count: Optional[int] = Field(default=None, ge=2, le=8)
+    max_messages: Optional[int] = Field(default=None, ge=1, le=50)
+
+
+class StepDraftOut(BaseModel):
+    name_en: str
+    name_fa: str
+    guideline_prompt: str
+    max_messages: Optional[int] = None
+
+
+class WizardDraftOut(BaseModel):
+    """An unsaved, AI-drafted wizard for the admin to review and edit."""
+
+    name: str
+    slug: str
+    title_en: str
+    title_fa: str
+    short_description_en: str
+    short_description_fa: str
+    icon: str
+    steps: List[StepDraftOut]
+    # Things the admin should check before saving, e.g. unknown tool names.
+    warnings: List[str] = []
 
 
 class WizardUpdate(BaseModel):
@@ -221,6 +256,9 @@ class StepCreate(BaseModel):
     position: Optional[int] = None
 
     model_config = {"populate_by_name": True}
+
+
+WizardCreate.model_rebuild()
 
 
 class StepBulkCreate(BaseModel):

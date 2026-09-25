@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import * as api from "../api.js";
 import { useT } from "../i18n.js";
 import WizardEditor from "./WizardEditor.jsx";
+import WizardGenerator from "./WizardGenerator.jsx";
 import Icon from "./Icon.jsx";
 
 // Admin panel for guided workflows: the list, plus create / publish / delete.
@@ -14,6 +15,7 @@ export default function WizardAdminPanel() {
   const [wizards, setWizards] = useState([]);
   const [editing, setEditing] = useState(null); // wizard id
   const [creating, setCreating] = useState(false);
+  const [generating, setGenerating] = useState(false); // the AI builder is open
   const [newName, setNewName] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -72,7 +74,16 @@ export default function WizardAdminPanel() {
 
   return (
     <div className="wizard-admin-panel">
-      {editing ? (
+      {generating ? (
+        <WizardGenerator
+          onCancel={() => setGenerating(false)}
+          onCreated={async (id) => {
+            setGenerating(false);
+            await refresh();
+            setEditing(id); // land in the editor to polish and publish
+          }}
+        />
+      ) : editing ? (
         <WizardEditor
           wizardId={editing}
           onClose={() => {
@@ -86,9 +97,14 @@ export default function WizardAdminPanel() {
           <div className="wz-editor-head">
             <p className="wz-section-sub">{t("admin.subtitle")}</p>
             {!creating && (
-              <button className="wz-btn primary" onClick={() => setCreating(true)}>
-                + {t("admin.new")}
-              </button>
+              <div className="wz-topbar-actions">
+                <button className="wz-btn ghost" onClick={() => setGenerating(true)}>
+                  <Icon name="sparkles" size={16} /> {t("ai.new")}
+                </button>
+                <button className="wz-btn primary" onClick={() => setCreating(true)}>
+                  + {t("admin.new")}
+                </button>
+              </div>
             )}
           </div>
 

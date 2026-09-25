@@ -76,7 +76,7 @@ PaperAgent/
 │   │                             #   MentionDropdown, Message, MessageInput, SessionBar/List, GuidelinesPage,
 │   │                             #   DownloadModal, DownloadStatus (provider PDF download UI),
 │   │                             #   WizardLanding/Card/Detail/Runner/Stepper/RunsPage,
-│   │                             #   WizardAdminPanel, WizardEditor, LangToggle, Icon
+│   │                             #   WizardAdminPanel, WizardEditor, WizardGenerator (AI builder), LangToggle, Icon
 │   ├── vite.config.js            # Dev server proxies /api -> :8000
 │   ├── nginx.conf                # Prod: serves bundle, proxies /api -> app:8000
 │   └── Dockerfile

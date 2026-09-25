@@ -47,11 +47,15 @@ class AcademicAgent(BaseAgent):
 
         self.skills_content = _load_skills()
 
-        # A summarization LLM (cheap, deterministic) keeps long chats in budget.
+        # A summarization LLM keeps long chats in budget. The trigger must sit
+        # well above the static prefix (system prompt + tool schemas, ~8k tokens):
+        # summarizing runs before *every* model call, so a low trigger re-summarizes
+        # on each step of a tool loop and rewrites history, which also defeats the
+        # provider's prompt cache.
         summarizer = SummarizationMiddleware(
             model=f"openai:{settings.OPENAI_MODEL}",
-            trigger=("tokens", 4000),   # summarize once history exceeds ~4k tokens
-            keep=("messages", 20),      # always retain the 20 most recent messages
+            trigger=("tokens", 60000),  # summarize only once history is genuinely long
+            keep=("tokens", 15000),     # retain the most recent ~15k tokens verbatim
         )
 
         middleware = [summarizer]
@@ -159,7 +163,9 @@ class AcademicAgent(BaseAgent):
             f"{sensitive_tools}"
             "- For any task that needs several steps or tool calls (roughly 3 or "
             "more), call `write_plan` FIRST to lay out the ordered steps, then call "
-            "`update_plan` to mark each step `in_progress`/`done` as you go. Your "
+            "`update_plan` only after real work completes a step — never several "
+            "times in a row. Mark several steps at once with `step_indices` "
+            "(e.g. `step_indices=[0, 1, 2], status=\"done\"`). Your "
             "current plan is shown back to you at the start of every turn, so it "
             "keeps you on track across summarization"
             f"{' and approval pauses' if approval else ''}. These "

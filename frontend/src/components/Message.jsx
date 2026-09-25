@@ -1,4 +1,5 @@
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { getToken } from "../auth.js";
 import { extractDois } from "../util/doi.js";
 
@@ -80,6 +81,9 @@ export default function Message({ role, content, onRequestPdf }) {
       <div className="role">Co-Pilot</div>
       <div className="md" dir="auto">
         <ReactMarkdown
+          // GFM adds tables, strikethrough and autolinks; plain CommonMark
+          // renders a pipe table as one run-on paragraph.
+          remarkPlugins={[remarkGfm]}
           components={{
             a({ href, children, ...props }) {
               if (isArtifactPath(href)) {
@@ -99,6 +103,15 @@ export default function Message({ role, content, onRequestPdf }) {
                 <a href={href} target="_blank" rel="noreferrer" {...props}>
                   {children}
                 </a>
+              );
+            },
+            // Wide tables (e.g. literature matrices) scroll inside the bubble
+            // instead of overflowing it.
+            table({ children }) {
+              return (
+                <div className="md-table-wrap">
+                  <table>{children}</table>
+                </div>
               );
             },
             img({ src, alt }) {

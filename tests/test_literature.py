@@ -237,7 +237,7 @@ def test_parse_openalex_caps_long_author_lists():
     data = {"results": [{"id": "https://openalex.org/W9", "authorships": authorships}]}
     p = _parse_openalex_results(data)[0]
     assert p["authors"].endswith(", et al.")
-    assert p["authors"].count(",") == 8  # 8 names + the trailing ", et al."
+    assert p["authors"].count(",") == 3  # 3 names + the trailing ", et al."
 
 
 def test_parse_openalex_missing_results_key():

@@ -7,6 +7,71 @@ All notable changes to this project. Format loosely follows
 Work in progress on the current branch (`main`) — not yet committed. Adds the
 authentication and persistence layer on top of the original agent MVP:
 ### Added
+- **Create a workflow with AI (admin panel).** A *Create with AI* button next
+  to *New workflow* opens `WizardGenerator.jsx`. The admin describes the goal,
+  the intended users, the number of steps (or leaves it to the AI) and a message
+  cap. `POST /admin/wizards/draft` drafts the whole workflow: bilingual title
+  and description, an icon, and each step's names, guideline prompt and cap.
+  The model is given the agent's real tool catalog. Nothing is saved at this
+  point. Guideline prompts that name tools the agent doesn't have come back as
+  `warnings`, and the slug is de-duplicated. The admin edits the draft and
+  creates it unpublished in one request: `POST /admin/wizards` now accepts
+  `steps`, created in the same transaction. Parsing and validation live in the
+  pure `wizard_service.parse_wizard_draft`, tested in `tests/test_wizard.py`.
+  Admin tooling is not billed.
+- **Two new seeded wizards** (`scripts/seed_wizards.py`):
+  - *Find a title for your thesis or paper* (`find-suitable-title-for-thesis`).
+    Four steps: constraints, recent-research scan, candidate titles, then a
+    novelty check and the final title. It reuses the slug of the empty admin
+    draft, so seeding fills in that draft.
+  - *Back your text with recent, reliable references*
+    (`enrich-with-references`). Four steps: claims needing support, a
+    recency-filtered search, `resolve_citation` checks, then citations woven
+    into the user's text.
+- `scripts/seed_wizards.py --only <slug> ...` seeds only the named wizards and
+  leaves the rest alone, so an admin's edits to other wizards are not reset.
+- `search_openalex` takes an optional `from_year` that limits results to
+  recent publications (OpenAlex `from_publication_date` filter).
+
+### Changed
+- **Lower per-turn LLM cost.** A LangSmith trace of one 7-turn wizard thread
+  showed the summarizer taking ~39% of spend. Three fixes:
+  - `SummarizationMiddleware` in `AcademicAgent` now triggers at 60k tokens
+    (was 4k, below the ~8k-token static prefix) and keeps the last ~15k tokens
+    (was 20 messages). The old trigger re-summarized before nearly every model
+    call in a tool loop, and each rewrite broke the prompt cache.
+  - `update_plan` accepts `step_indices` to mark several steps in one call. The
+    prompt and `skills.md` now say to update only after real progress. The
+    agent had been making 8 back-to-back single-step calls, each a full
+    model round-trip.
+  - Literature search output is smaller: `max_results` is capped at 10 (was
+    25), abstract snippets are 200 chars (was 300), and listings show the first
+    3 authors + "et al." `resolve_citation` still returns full author lists.
+
+### Fixed
+- **Markdown tables in agent replies rendered as one run-on paragraph.**
+  `react-markdown` was used without `remark-gfm`, so GFM pipe tables were not
+  parsed. `Message.jsx` and `GuidelinesPage.jsx` now pass `remarkGfm`; tables
+  get borders and scroll horizontally inside the chat bubble.
+- **Agent chat crashed with reasoning models on `/v1/chat/completions`.** The
+  provider rejects function tools when a reasoning effort is in play
+  (`Function tools with reasoning_effort are not supported for <model> in
+  /v1/chat/completions. To use function tools, use /v1/responses or set
+  reasoning_effort to 'none'.`). Both agents now build their `ChatOpenAI` with
+  `agent_chat_kwargs()` (`app/repositories/llm.py`), driven by two new settings:
+  `AGENT_REASONING_EFFORT` (default `"none"`, empty means send nothing) and
+  `AGENT_USE_RESPONSES_API` (route agent calls to `/v1/responses`, which allows
+  tools *with* reasoning). Only tool-bound models need this; plain
+  `.invoke()` tool code is unaffected.
+
+### Added
+- **`powerpoint.md` — presentation source for the product deck.** A slide-by-slide
+  spec (26 slides, five acts) covering every capability area in `feature.md`,
+  plus deck settings, brand colors lifted from `frontend/src/styles.css`,
+  per-slide speaker notes, a screenshot capture list, and short/technical/Persian
+  variants. It is written to be handed to Claude to generate
+  `dist/academic-co-pilot.pptx` via `uv run --with python-pptx python
+  scripts/build_deck.py`. Update `feature.md` first, then reflect changes here.
 - **Admin switch to open or close user registration.** A new singleton
   `site_settings` row (`app/models/site.py`) holds site-wide switches an admin
   can flip at runtime — first one is `registration_open` (default open). When

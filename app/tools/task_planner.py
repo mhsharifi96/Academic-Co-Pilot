@@ -15,7 +15,7 @@ The current ``session_id`` is read from the LangGraph run config
 never has to supply it.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
@@ -49,7 +49,8 @@ def write_plan(steps: List[str], config: RunnableConfig) -> str:
     Call this FIRST whenever a request needs several steps or tool calls (roughly
     3 or more) — e.g. searching literature, then ingesting papers, then drafting.
     It replaces any existing plan with a fresh checklist (every step starts
-    "pending"). As you complete each step, call `update_plan` to mark progress.
+    "pending"). As work completes steps, call `update_plan` to mark progress —
+    batching several steps into one call.
     The current plan is shown back to you at the start of every turn, so it keeps
     you on track even across summarization and approval pauses.
 
@@ -65,16 +66,23 @@ def write_plan(steps: List[str], config: RunnableConfig) -> str:
 
 
 @tool
-def update_plan(step_index: int, status: str, config: RunnableConfig) -> str:
+def update_plan(
+    status: str,
+    config: RunnableConfig,
+    step_index: Optional[int] = None,
+    step_indices: Optional[List[int]] = None,
+) -> str:
     """
-    Update the status of one step in the current plan.
+    Update the status of one or more steps in the current plan.
 
-    Use this as you work: mark a step "in_progress" when you start it and "done"
-    when it is finished, so the plan reflects real progress.
+    Call this only after real work finishes a step (or several) — not once per
+    step in a row. Batch updates in ONE call with `step_indices`: e.g. after a
+    search that covered steps 0-2, call `step_indices=[0, 1, 2], status="done"`.
 
     Args:
-        step_index: Zero-based index of the step (as shown in the rendered plan).
         status: New status — one of "in_progress" or "done" (or "pending" to reset).
+        step_index: Zero-based index of a single step (as shown in the rendered plan).
+        step_indices: Zero-based indices of several steps to set to `status` at once.
     """
     session_id = _session_id(config)
     if not session_id:
@@ -82,12 +90,20 @@ def update_plan(step_index: int, status: str, config: RunnableConfig) -> str:
     if status not in ("pending", "in_progress", "done"):
         return f"Error: invalid status {status!r}. Use 'in_progress', 'done', or 'pending'."
 
+    indices = list(step_indices or [])
+    if step_index is not None:
+        indices.append(step_index)
+    if not indices:
+        return "Error: pass `step_index` or `step_indices`."
+
     plan = session_manager.sync_get_plan(session_id)
     if not plan:
         return "There is no plan to update yet. Call `write_plan` first."
-    if not (0 <= step_index < len(plan)):
-        return f"Error: step_index {step_index} is out of range (plan has {len(plan)} steps)."
+    bad = [i for i in indices if not (0 <= i < len(plan))]
+    if bad:
+        return f"Error: step_index {bad[0]} is out of range (plan has {len(plan)} steps)."
 
-    session_manager.sync_update_plan_step(session_id, step_index, status)
+    for i in dict.fromkeys(indices):
+        session_manager.sync_update_plan_step(session_id, i, status)
     plan = session_manager.sync_get_plan(session_id)
     return "Plan updated:\n" + render_plan(plan)

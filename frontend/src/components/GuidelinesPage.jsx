@@ -1,4 +1,5 @@
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 // Static help/guidelines page.  Content is plain markdown so it's easy to edit.
 // Keep this in sync with guideline.md at the project root.
@@ -99,7 +100,7 @@ export default function GuidelinesPage({ onBack }) {
         <button className="ghost back-btn" onClick={onBack}>
           ← Back to chat
         </button>
-        <ReactMarkdown>{GUIDE}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{GUIDE}</ReactMarkdown>
       </div>
     </div>
   );

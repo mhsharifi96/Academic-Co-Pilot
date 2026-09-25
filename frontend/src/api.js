@@ -189,6 +189,15 @@ export async function adminCreateWizard(fields) {
   return request("/admin/wizards", { method: "POST", body: fields });
 }
 
+// Ask the AI to draft a whole workflow from a description. Nothing is saved:
+// the draft comes back for review and is created with adminCreateWizard.
+export async function adminDraftWizard({ goal, audience, step_count, max_messages }) {
+  return request("/admin/wizards/draft", {
+    method: "POST",
+    body: { goal, audience, step_count, max_messages },
+  });
+}
+
 export async function adminUpdateWizard(wizardId, fields) {
   return request(`/admin/wizards/${encodeURIComponent(wizardId)}`, {
     method: "PATCH",

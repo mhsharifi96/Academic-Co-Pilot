@@ -20,7 +20,7 @@ as strings — tools must never raise into the LangGraph run.
 
 import re
 import xml.etree.ElementTree as ET
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import httpx
 from langchain_core.tools import tool
@@ -37,6 +37,29 @@ _USER_AGENT = f"PaperAgent/1.0 (mailto:{_POLITE_MAILTO})"
 
 _ATOM = "{http://www.w3.org/2005/Atom}"
 _DOI_RE = re.compile(r"^10\.\d{4,9}/\S+$", re.IGNORECASE)
+
+# Search results stay in the chat history and are re-sent on every later model
+# call, so keep each listing compact: few results, short abstracts, lead authors.
+# (`resolve_citation` still returns the full author list for citations.)
+_MAX_RESULTS = 10
+_ABSTRACT_CHARS = 200
+_MAX_AUTHORS = 3
+
+
+def _clamp_results(n: int) -> int:
+    return max(1, min(n, _MAX_RESULTS))
+
+
+def _short_authors(names: List[str]) -> str:
+    """Join the lead authors, collapsing long lists to 'A, B, C, et al.'."""
+    names = [n for n in names if n]
+    if len(names) > _MAX_AUTHORS:
+        return ", ".join(names[:_MAX_AUTHORS]) + ", et al."
+    return ", ".join(names)
+
+
+def _snippet(text: str) -> str:
+    return text[:_ABSTRACT_CHARS] + ("…" if len(text) > _ABSTRACT_CHARS else "")
 
 
 # --------------------------------------------------------------------------- #
@@ -61,7 +84,7 @@ def _parse_arxiv_atom(xml: str) -> List[Dict[str, str]]:
         arxiv_id = link.rsplit("/abs/", 1)[-1] if "/abs/" in link else link
         entries.append({
             "title": " ".join(title.split()),
-            "authors": ", ".join(a for a in authors if a),
+            "authors": _short_authors(authors),
             "year": published[:4],
             "id": arxiv_id,
             "link": link,
@@ -88,9 +111,10 @@ def search_literature(query: str, max_results: int = 8) -> str:
 
     Args:
         query: Search terms (e.g. 'agentic RAG for legal compliance').
-        max_results: Maximum number of papers to return (default 8).
+        max_results: Maximum number of papers to return per source (default 8,
+            capped at 10).
     """
-    limit = max(1, min(max_results, 25))
+    limit = _clamp_results(max_results)
     sections: List[str] = [f"Literature search for {query!r}:"]
 
     scopus_status, scopus_papers = _search_scopus(query, limit)
@@ -121,7 +145,7 @@ def _search_arxiv(query: str, max_results: int) -> Tuple[str, List[Dict[str, str
     params = {
         "search_query": f"all:{query}",
         "start": 0,
-        "max_results": max(1, min(max_results, 25)),
+        "max_results": _clamp_results(max_results),
         "sortBy": "relevance",
     }
     try:
@@ -141,7 +165,7 @@ def _search_arxiv(query: str, max_results: int) -> Tuple[str, List[Dict[str, str
 def _format_arxiv_results(query: str, papers: List[Dict[str, str]]) -> str:
     blocks = [f"arXiv results ({len(papers)}) for {query!r}:\n"]
     for i, p in enumerate(papers, 1):
-        snippet = p["summary"][:300] + ("…" if len(p["summary"]) > 300 else "")
+        snippet = _snippet(p["summary"])
         blocks.append(
             f"{i}. {p['title']} ({p['year']})\n"
             f"   Authors: {p['authors']}\n"
@@ -225,7 +249,7 @@ def _parse_crossref_results(data: Dict) -> List[Dict[str, str]]:
         doi = work.get("DOI", "") or ""
         papers.append({
             "title": title,
-            "authors": ", ".join(a for a in authors if a),
+            "authors": _short_authors(authors),
             "year": _crossref_year(work),
             "venue": (work.get("container-title") or [""])[0],
             "doi": doi,
@@ -238,7 +262,7 @@ def _parse_crossref_results(data: Dict) -> List[Dict[str, str]]:
 def _search_crossref(query: str, max_results: int) -> Tuple[str, List[Dict[str, str]]]:
     params = {
         "query.bibliographic": query,
-        "rows": max(1, min(max_results, 25)),
+        "rows": _clamp_results(max_results),
         "mailto": _POLITE_MAILTO,
     }
     try:
@@ -362,7 +386,7 @@ def _search_scopus(query: str, max_results: int) -> Tuple[str, List[Dict[str, st
     scopus_query = query if re.search(r"\b[A-Z\-]+\(", query) else f"TITLE-ABS-KEY({query})"
     params = {
         "query": scopus_query,
-        "count": max(1, min(max_results, 25)),
+        "count": _clamp_results(max_results),
         "start": 0,
         "view": "STANDARD",
         "sort": "relevancy",
@@ -410,7 +434,7 @@ def _format_scopus_results(
 
 
 @tool
-def search_scopus(query: str, max_results: int = 10) -> str:
+def search_scopus(query: str, max_results: int = 8) -> str:
     """
     Search Elsevier's Scopus for peer-reviewed / indexed academic literature
     (requires an Elsevier API key configured on the server).
@@ -423,7 +447,7 @@ def search_scopus(query: str, max_results: int = 10) -> str:
     Args:
         query: Search terms (e.g. 'agentic RAG legal compliance') or a Scopus
             boolean query.
-        max_results: Maximum number of results to return (default 10, capped at 25).
+        max_results: Maximum number of results to return (default 8, capped at 10).
     """
     status, papers = _search_scopus(query, max_results)
     if not papers:
@@ -473,11 +497,6 @@ def _parse_openalex_results(data: Dict) -> List[Dict[str, str]]:
             ((a.get("author") or {}).get("display_name") or "").strip()
             for a in (w.get("authorships") or [])
         ]
-        names = [n for n in names if n]
-        # Cap very long author lists so the tool output stays readable.
-        authors = (
-            ", ".join(names[:8]) + ", et al." if len(names) > 8 else ", ".join(names)
-        )
         source = (w.get("primary_location") or {}).get("source") or {}
         doi = (w.get("doi") or "")
         if doi.startswith("https://doi.org/"):
@@ -486,7 +505,7 @@ def _parse_openalex_results(data: Dict) -> List[Dict[str, str]]:
         cited = w.get("cited_by_count")
         papers.append({
             "title": (w.get("title") or "(untitled)").strip(),
-            "authors": authors,
+            "authors": _short_authors(names),
             "year": str(w.get("publication_year") or ""),
             "venue": (source.get("display_name") or "").strip(),
             "doi": doi,
@@ -501,7 +520,9 @@ def _parse_openalex_results(data: Dict) -> List[Dict[str, str]]:
 
 
 @tool
-def search_openalex(query: str, max_results: int = 8) -> str:
+def search_openalex(
+    query: str, max_results: int = 8, from_year: Optional[int] = None
+) -> str:
     """
     Search OpenAlex — an open catalog of ~250M scholarly works across all
     disciplines — for papers matching a query. Works keyless for light/testing
@@ -518,13 +539,17 @@ def search_openalex(query: str, max_results: int = 8) -> str:
     Args:
         query: Search terms (e.g. 'agentic RAG for legal compliance'). Matched
             against title, abstract, and full text.
-        max_results: Maximum number of works to return (default 8, capped at 25).
+        max_results: Maximum number of works to return (default 8, capped at 10).
+        from_year: Only return works published in or after this year (e.g.
+            2023). Use it when the user wants recent literature.
     """
     params = {
         "search": query,
-        "per-page": max(1, min(max_results, 25)),
+        "per-page": _clamp_results(max_results),
         "select": _OPENALEX_SELECT,
     }
+    if from_year:
+        params["filter"] = f"from_publication_date:{int(from_year)}-01-01"
     # Since 2026-02-13 OpenAlex requires an API key for non-trivial use (the old
     # `mailto` polite pool was retired). Send the key when configured; without it
     # a few calls still work for testing before OpenAlex returns 409.
@@ -563,7 +588,7 @@ def search_openalex(query: str, max_results: int = 8) -> str:
         )
         doi = f"  DOI: {p['doi']}" if p["doi"] else ""
         if p["abstract"]:
-            snippet = p["abstract"][:300] + ("…" if len(p["abstract"]) > 300 else "")
+            snippet = _snippet(p["abstract"])
         else:
             snippet = "(no abstract available)"
         blocks.append(

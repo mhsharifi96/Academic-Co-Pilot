@@ -77,7 +77,7 @@ This file defines the skills (tools) available to the Academic Co-Pilot Agent.
 *   **Description:** Searches multiple academic indexes for papers matching a query: Scopus/Elsevier first when `ELSEVIER_API_KEY` is configured, arXiv next for recent preprints, and Crossref last as a DOI/metadata fallback. Use this for "find papers" or "find a paper by title/topic" requests, especially when recent 2025/2026 work may not appear as Crossref's top result. Read-only (no approval).
 *   **Inputs:**
     *   `query` (str): Search terms.
-    *   `max_results` (int, default=8): Maximum number of papers to return (capped at 25).
+    *   `max_results` (int, default=8): Maximum number of papers per source (capped at 10).
 
 ## 13. Citation Resolver (`resolve_citation`)
 *   **Description:** Resolves a DOI or paper title to clean citation metadata (authors, year, venue, DOI) plus a BibTeX entry via Crossref (free, no API key). Use this to ground citations in real metadata instead of guessing. Read-only (no approval).
@@ -92,24 +92,26 @@ This file defines the skills (tools) available to the Academic Co-Pilot Agent.
     *   `output_path` (Optional[str]): Path for the .docx. Defaults to `data/<slug>.docx`.
 
 ## 15. Task Planner (`write_plan`, `update_plan`)
-*   **Description:** A self-authored todo list for multi-step tasks. Call `write_plan` FIRST whenever a request needs several steps/tool calls (roughly 3+) to lay out an ordered checklist, then call `update_plan` to mark each step `in_progress`/`done` as you progress. The plan is stored per session (outside the chat history) and shown back to you at the start of every turn, so it survives history summarization and approval pauses. Read-only scratch memory (no approval); the `session_id` is supplied automatically. Skip planning for simple one-or-two-step requests.
+*   **Description:** A self-authored todo list for multi-step tasks. Call `write_plan` FIRST whenever a request needs several steps/tool calls (roughly 3+) to lay out an ordered checklist, then call `update_plan` only after real work completes a step — never several times in a row; mark several steps in ONE call with `step_indices`. The plan is stored per session (outside the chat history) and shown back to you at the start of every turn, so it survives history summarization and approval pauses. Read-only scratch memory (no approval); the `session_id` is supplied automatically. Skip planning for simple one-or-two-step requests.
 *   **Inputs (`write_plan`):**
     *   `steps` (List[str]): Ordered, short step descriptions.
 *   **Inputs (`update_plan`):**
-    *   `step_index` (int): Zero-based index of the step to update.
     *   `status` (str): `in_progress`, `done`, or `pending`.
+    *   `step_index` (int, optional): Zero-based index of one step to update.
+    *   `step_indices` (List[int], optional): Several steps to set to `status` at once (e.g. `[0, 1, 2]`).
 
 ## 16. Scopus Search (`search_scopus`)
 *   **Description:** Searches Elsevier's Scopus for peer-reviewed / indexed academic literature, including citation counts. Use directly when the user specifically asks for Scopus/Elsevier results; otherwise `search_literature` already tries Scopus first. Requires `ELSEVIER_API_KEY` on the server; reports a friendly message when unset. Plain keywords are matched against title/abstract/keywords; Scopus boolean syntax is also accepted. Read-only (no approval).
 *   **Inputs:**
     *   `query` (str): Search terms or a Scopus boolean query.
-    *   `max_results` (int, default=10): Maximum number of results (capped at 25).
+    *   `max_results` (int, default=8): Maximum number of results (capped at 10).
 
 ## 17. OpenAlex Search (`search_openalex`)
 *   **Description:** Searches OpenAlex — a broad open catalog of ~250M scholarly works across all disciplines — for papers matching a query. Complements arXiv (`search_literature`) and Scopus (`search_scopus`) with wide, openly-licensed coverage; returns title, authors, year, venue, citation count, open-access status/link (when available), DOI, the OpenAlex id, and an abstract snippet. Ranked by relevance. Runs keyless for light/testing use; set `OPENALEX_API_KEY` on the server (a free key from openalex.org grants $1 of usage/day) for reliable use — reports a friendly message when the keyless allowance is exhausted. Read-only (no approval).
 *   **Inputs:**
     *   `query` (str): Search terms, matched against title/abstract/full text.
-    *   `max_results` (int, default=8): Maximum number of works (capped at 25).
+    *   `max_results` (int, default=8): Maximum number of works (capped at 10).
+    *   `from_year` (int, optional): Only works published in or after this year — use for "recent/newest" requests.
 
 ## 18. Open Access PDF Finder (`find_and_ingest_open_access_pdf`) **[Requires Approval]**
 *   **Description:** Searches open academic metadata for an open-access PDF URL, downloads only verified PDF responses, saves the PDF under the current session, ingests it into the vector store, and attaches it to the session file list. Use when the user asks to find an open-access PDF online and add/read it in the conversation. Writes and ingests a file → gated by approval when enabled.

@@ -548,3 +548,70 @@ def test_guidance_marker_instruction_survives_round_trip():
     reply = f"Looks good.\n\n{svc.STEP_COMPLETE_MARKER}"
     clean, done = svc.extract_completion_signal(reply)
     assert (clean, done) == ("Looks good.", True)
+
+
+# --------------------------------------------------------------------------- #
+# AI-drafted wizards
+# --------------------------------------------------------------------------- #
+import json as _json
+
+_DRAFT = {
+    "name": "find a title",
+    "slug": "Find A Title!",
+    "title_en": "Find a title",
+    "title_fa": "یافتن عنوان",
+    "short_description_en": "Pick a thesis title.",
+    "short_description_fa": "انتخاب عنوان پایان‌نامه.",
+    "icon": "sparkles",
+    "steps": [
+        {"name_en": "Scope", "name_fa": "دامنه", "guideline_prompt": "Goal: scope.", "max_messages": 6},
+        {"name_en": "Search", "guideline_prompt": "Use `search_openalex` with `from_year`, then `made_up_tool`."},
+    ],
+}
+
+
+def test_draft_prompt_lists_tools_and_step_rule():
+    prompt = svc.build_wizard_draft_prompt(
+        goal="Help students pick a title", step_count=4,
+        tools=[("search_openalex(query, from_year)", "Search OpenAlex")],
+    )
+    assert "exactly 4 steps" in prompt
+    assert "- search_openalex(query, from_year): Search OpenAlex" in prompt
+    assert "Help students pick a title" in prompt
+
+
+def test_parse_draft_fills_gaps_and_flags_unknown_tools():
+    raw = "```json\n" + _json.dumps(_DRAFT, ensure_ascii=False) + "\n```"
+    draft = svc.parse_wizard_draft(
+        raw, known_names=["search_openalex", "from_year"], default_max_messages=8
+    )
+    assert draft.fields["slug"] == "find-a-title"
+    assert draft.fields["icon"] == "sparkles"
+    assert [s["max_messages"] for s in draft.steps] == [6, 8]
+    assert draft.steps[1]["name_fa"] == "Search"  # falls back to English
+    assert len(draft.warnings) == 1 and "made_up_tool" in draft.warnings[0]
+
+
+def test_parse_draft_replaces_unknown_icon_and_warns_on_missing_persian():
+    data = dict(_DRAFT, icon="rocket", title_fa="")
+    draft = svc.parse_wizard_draft(_json.dumps(data))
+    assert draft.fields["icon"] == "compass"
+    assert any("Persian" in w for w in draft.warnings)
+
+
+def test_parse_draft_caps_step_count():
+    step_spec = {"name_en": "s", "guideline_prompt": "Goal: x."}
+    draft = svc.parse_wizard_draft(_json.dumps(dict(_DRAFT, steps=[step_spec] * 20)))
+    assert len(draft.steps) == svc.DRAFT_MAX_STEPS
+
+
+@pytest.mark.parametrize("raw", ["", "no json here", '{"steps": []}', '{"steps": [{"name_en": "x"}]}'])
+def test_parse_draft_rejects_unusable_replies(raw):
+    with pytest.raises(ValueError):
+        svc.parse_wizard_draft(raw)
+
+
+def test_unique_slug():
+    assert svc.unique_slug("a", []) == "a"
+    assert svc.unique_slug("a", ["a", "a-2"]) == "a-3"
+    assert svc.unique_slug("", []) == "workflow"

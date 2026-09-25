@@ -377,10 +377,17 @@ UI: the **Site** tab of `AdminPage.jsx` (`SiteSettingsPanel.jsx`).
   (bilingual fields side by side, guideline prompt, message cap, reordering),
   plus **Add many…** — paste an outline, one step name per line, and get the
   whole sequence created in order in a single request.
-- **Five shipped workflows** (`scripts/seed_wizards.py`, idempotent): *Run a
+- **Create a workflow with AI** — the admin describes what the workflow should
+  do (English or Persian), and the AI drafts the bilingual title/description,
+  icon and every step with its guideline prompt, grounded in the agent's real
+  tools. The admin reviews and edits the draft, then creates it unpublished.
+  Unknown tool names are flagged before saving
+  (`POST /admin/wizards/draft`, `WizardGenerator.jsx`).
+- **Seven shipped workflows** (`scripts/seed_wizards.py`, idempotent): *Run a
   systematic literature review* (6 steps), *Analyse your dataset*, *Understand a
   paper deeply*, *Write a research proposal*, *Get ready to submit* (5 steps
-  each) — bilingual throughout, each step carrying a written guideline prompt
+  each), *Find a title for your thesis or paper* and *Back your text with
+  recent, reliable references* (4 steps each) — bilingual throughout, each step carrying a written guideline prompt
   that drives the agent through the real tools.
 - **Guidelines page** — in-app usage guidance.
 - **Admin page** — user/balance management for admins.

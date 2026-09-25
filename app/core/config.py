@@ -20,6 +20,19 @@ class Settings(BaseSettings):
     POWERFUL_MODEL: str = "gpt-5.4-mini"
     # Image model used by the LLM repository's generate_image() (infographics).
     IMAGE_MODEL: str = "gpt-image-1"
+    # Reasoning effort sent with agent (tool-calling) requests. Some reasoning
+    # models reject function tools on /v1/chat/completions unless the effort is
+    # explicitly "none" ("Function tools with reasoning_effort are not supported
+    # for <model> in /v1/chat/completions"), so "none" is the safe default here.
+    # Set to null/empty to send no reasoning_effort at all, or to
+    # minimal|low|medium|high for a provider/model that accepts tools with
+    # reasoning (see AGENT_USE_RESPONSES_API below).
+    AGENT_REASONING_EFFORT: Optional[str] = "none"
+    # Route agent calls through the OpenAI Responses API instead of Chat
+    # Completions. Responses supports function tools together with real
+    # reasoning, so enable this (plus a non-"none" AGENT_REASONING_EFFORT) when
+    # the model should think before calling tools.
+    AGENT_USE_RESPONSES_API: bool = False
 
     # PostgreSQL / pgvector Configuration
     DATABASE_URL: str

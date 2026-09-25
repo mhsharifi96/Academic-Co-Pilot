@@ -1,7 +1,7 @@
 """
 Seed the guided workflows ("wizards") that ship with the product.
 
-Five real, publishable workflows with bilingual (en/fa) presentation text and
+Seven real, publishable workflows with bilingual (en/fa) presentation text and
 written-out `guideline_prompt`s that drive the shared `AcademicAgent` through
 the app's actual tools. This is content, not schema: the tables are created by
 `init_models()` on startup — this script only fills them.
@@ -17,6 +17,7 @@ ones have their presentation fields refreshed, and their steps are left alone �
 an admin's edits in the wizard editor always win. Pass `--replace-steps` to
 rewrite the steps of the seeded wizards anyway; that is refused for any wizard
 users have already run, so a live run can never lose the step it is sitting on.
+Pass `--only <slug> ...` to seed just those wizards and leave the rest alone.
 
 Nothing here is published automatically unless `--publish` is passed: the
 default is to create the workflows unpublished so an admin can read them over
@@ -27,7 +28,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Sequence
 
 from sqlalchemy import func, select
 
@@ -629,6 +630,206 @@ WIZARDS: List[Dict[str, Any]] = [
             },
         ],
     },
+    {
+        # Same slug as the empty draft an admin started in the editor, so the
+        # seed fills that draft in rather than creating a duplicate.
+        "slug": "find-suitable-title-for-thesis",
+        "name": "find a title",
+        "icon": "sparkles",
+        "position": 6,
+        "title_en": "Find a title for your thesis or paper",
+        "title_fa": "یافتن عنوان مناسب برای پایان‌نامه یا مقاله",
+        "short_description_en": (
+            "From a rough area of interest to one defensible title: pin down "
+            "your constraints, see what recent work already covers, compare "
+            "candidate titles, and check the final one is not already taken."
+        ),
+        "short_description_fa": (
+            "از یک حوزهٔ کلی تا یک عنوان قابل دفاع: مشخص کردن محدودیت‌ها، بررسی "
+            "پژوهش‌های اخیر، مقایسهٔ عنوان‌های پیشنهادی و اطمینان از تکراری نبودن "
+            "عنوان نهایی."
+        ),
+        "steps": [
+            {
+                "name_en": "Define the topic and constraints",
+                "name_fa": "تعریف حوزه و محدودیت‌ها",
+                "max_messages": 6,
+                "guideline_prompt": (
+                    "Goal: know enough about the user's situation to judge "
+                    "whether a title is feasible for THEM, not just "
+                    "interesting.\n\n"
+                    "Find out, one or two questions per message: the field and "
+                    "the broad area of interest; whether this is a master's "
+                    "thesis, a PhD, or a paper; the methods they can use "
+                    "(qualitative, quantitative, experimental, computational); "
+                    "what data or population they can realistically reach; the "
+                    "time available; and any direction their supervisor has "
+                    "set. Ask whether the title is needed in Persian, English, "
+                    "or both.\n\n"
+                    "End with a short summary of these constraints as a list "
+                    "the user can correct — every later step is judged against "
+                    "it."
+                ),
+            },
+            {
+                "name_en": "Scan recent research",
+                "name_fa": "بررسی پژوهش‌های اخیر",
+                "max_messages": 8,
+                "guideline_prompt": (
+                    "Goal: see what recent work already covers, so the title "
+                    "aims at a gap instead of a crowded question.\n\n"
+                    "Run two or three focused searches — not one per keyword. "
+                    "Use `search_openalex` with `from_year` set to three years "
+                    "ago for the recent picture, and `search_literature` for "
+                    "preprints. Show at most 8 papers in one compact table: "
+                    "title, year, venue, citations, one line on what it "
+                    "studies.\n\n"
+                    "Then say plainly which sub-questions look saturated, "
+                    "which are thin, and which combinations of population, "
+                    "method, or setting nobody seems to have tried. Never "
+                    "invent a paper to make a gap look real; if the searches "
+                    "come back sparse, say so."
+                ),
+            },
+            {
+                "name_en": "Propose candidate titles",
+                "name_fa": "پیشنهاد عنوان‌های اولیه",
+                "max_messages": 8,
+                "guideline_prompt": (
+                    "Goal: five to seven candidate titles the user can "
+                    "actually compare.\n\n"
+                    "Draw them from the gaps found in the previous step and "
+                    "the user's constraints; `suggest_paper_titles` can seed "
+                    "ideas, but edit its output rather than passing it on. "
+                    "Each title names the main variable or phenomenon, the "
+                    "population or setting, and — where it matters — the "
+                    "method. Keep titles under about 20 words, with no vague "
+                    "words like 'study of' or 'investigation into'.\n\n"
+                    "Present them as a table: the title (in both languages if "
+                    "asked), the gap it targets, the method it implies, "
+                    "feasibility against the constraints (high/medium/low), "
+                    "and novelty. Recommend one and say why. Let the user mix "
+                    "and edit candidates."
+                ),
+            },
+            {
+                "name_en": "Validate and finalise",
+                "name_fa": "بررسی و نهایی‌سازی",
+                "max_messages": 6,
+                "guideline_prompt": (
+                    "Goal: one final title the user can take to their "
+                    "supervisor with confidence.\n\n"
+                    "For the one or two titles the user prefers, search the "
+                    "key terms with `search_openalex` to check nobody has "
+                    "already published the same question. If a close match "
+                    "exists, show it and adjust the title so it clearly "
+                    "differs.\n\n"
+                    "Deliver: the final title (in the requested languages), a "
+                    "three-sentence problem statement, the research question, "
+                    "four to six keywords, and two or three of the recent "
+                    "papers from the scan that it builds on, with DOIs."
+                ),
+            },
+        ],
+    },
+    {
+        "slug": "enrich-with-references",
+        "name": "enrich with references",
+        "icon": "quote",
+        "position": 7,
+        "title_en": "Back your text with recent, reliable references",
+        "title_fa": "غنی‌سازی متن با منابع جدید و معتبر",
+        "short_description_en": (
+            "Bring a draft; leave with every key claim backed by a recent, "
+            "verified source. Find the claims that need support, search the "
+            "latest literature, check each reference exists, and weave the "
+            "citations into your text."
+        ),
+        "short_description_fa": (
+            "متن خود را بیاورید و با ادعاهایی مستند به منابع جدید و "
+            "راستی‌آزمایی‌شده برگردید: شناسایی ادعاهای نیازمند منبع، جست‌وجوی "
+            "تازه‌ترین پژوهش‌ها، بررسی وجود واقعی هر منبع و افزودن ارجاع‌ها به متن."
+        ),
+        "steps": [
+            {
+                "name_en": "Bring your text",
+                "name_fa": "افزودن متن",
+                "max_messages": 6,
+                "guideline_prompt": (
+                    "Goal: a numbered list of the claims in the user's text "
+                    "that need a reference.\n\n"
+                    "The user pastes the text or uploads it (check with "
+                    "`list_session_files`). Read it and list the statements "
+                    "that need support: facts, statistics, definitions, "
+                    "method choices, and claims about what 'recent studies "
+                    "show'. For each give the claim in a few words, its type, "
+                    "and whether it already has a citation. Skip the user's "
+                    "own arguments and common knowledge.\n\n"
+                    "Agree three things before moving on: the citation style "
+                    "(APA, IEEE, or Vancouver), how recent sources must be "
+                    "(default: the last three years), and whether preprints "
+                    "are acceptable."
+                ),
+            },
+            {
+                "name_en": "Find recent sources",
+                "name_fa": "یافتن منابع جدید",
+                "max_messages": 10,
+                "guideline_prompt": (
+                    "Goal: one or two recent, reliable sources for each "
+                    "claim.\n\n"
+                    "Group related claims and search once per group, not once "
+                    "per claim. Use `search_openalex` with `from_year` set to "
+                    "the agreed recency window, and `search_scopus` or "
+                    "`search_literature` where OpenAlex is thin. Judge "
+                    "reliability: prefer peer-reviewed journals and major "
+                    "conferences; weigh citation count against the paper's "
+                    "age; label preprints as such; drop anything without a "
+                    "DOI or a stable link.\n\n"
+                    "Show the result as a table: claim number, source (first "
+                    "author, year, title), venue, DOI, and one line on what "
+                    "the source actually says about the claim. If a source "
+                    "says something weaker or different from the claim, say "
+                    "so — the text may need to change, not just gain a "
+                    "citation. If nothing reliable turns up, mark the claim "
+                    "'no source found'. Never invent a reference."
+                ),
+            },
+            {
+                "name_en": "Verify the references",
+                "name_fa": "راستی‌آزمایی منابع",
+                "max_messages": 6,
+                "guideline_prompt": (
+                    "Goal: every chosen reference is confirmed to exist, with "
+                    "correct metadata.\n\n"
+                    "Call `resolve_citation` with each chosen DOI. Replace any "
+                    "reference whose metadata does not match what was shown "
+                    "in the previous step, or drop it and mark the claim "
+                    "again. Report the result in one short list: verified, "
+                    "corrected, dropped.\n\n"
+                    "Only verified references move on to the final text."
+                ),
+            },
+            {
+                "name_en": "Enrich the text",
+                "name_fa": "افزودن ارجاع‌ها به متن",
+                "max_messages": 8,
+                "guideline_prompt": (
+                    "Goal: the user's text, returned with citations built "
+                    "in.\n\n"
+                    "Insert in-text citations in the agreed style, changing "
+                    "the user's wording only where a source requires it (for "
+                    "example, a claim the evidence does not fully support). "
+                    "Mark every changed sentence so the user can review it, "
+                    "and list those changes after the text.\n\n"
+                    "Finish with the complete reference list in the agreed "
+                    "style, plus any claims still marked 'no source found' so "
+                    "the user can cut or rephrase them. Offer to run "
+                    "`validate_references` on the final text."
+                ),
+            },
+        ],
+    },
 ]
 
 
@@ -646,12 +847,16 @@ PRESENTATION_FIELDS = (
 )
 
 
-async def seed(*, replace_steps: bool, publish: bool) -> None:
+async def seed(
+    *, replace_steps: bool, publish: bool, only: Sequence[str] = ()
+) -> None:
     created = updated = skipped = 0
 
     async with AsyncSessionLocal() as db:
         for spec in WIZARDS:
             slug = spec["slug"]
+            if only and slug not in only:
+                continue
             steps = spec["steps"]
 
             wizard = await db.scalar(select(Wizard).where(Wizard.slug == slug))
@@ -734,11 +939,23 @@ def main() -> None:
         action="store_true",
         help="publish the seeded wizards so they appear on the landing page",
     )
+    parser.add_argument(
+        "--only",
+        nargs="+",
+        metavar="SLUG",
+        default=(),
+        help="seed only these wizards; the others are not touched at all",
+    )
     args = parser.parse_args()
+    unknown = set(args.only) - {spec["slug"] for spec in WIZARDS}
+    if unknown:
+        parser.error(f"unknown slug(s): {', '.join(sorted(unknown))}")
 
     async def run() -> None:
         await init_models()  # no-op when the tables already exist
-        await seed(replace_steps=args.replace_steps, publish=args.publish)
+        await seed(
+            replace_steps=args.replace_steps, publish=args.publish, only=args.only
+        )
 
     asyncio.run(run())
 

@@ -34,6 +34,7 @@ from app.api.schemas.wizard import (
     ReorderStepsRequest,
     StartRunRequest,
     StepAdminOut,
+    StepDraftOut,
     SuggestionOut,
     SuggestionsResponse,
     StepBulkCreate,
@@ -42,6 +43,8 @@ from app.api.schemas.wizard import (
     WizardAdminDetailOut,
     WizardAdminOut,
     WizardCreate,
+    WizardDraftOut,
+    WizardDraftRequest,
     WizardMessageOut,
     WizardPublicDetailOut,
     WizardPublicOut,
@@ -770,15 +773,107 @@ async def admin_create_wizard(
     if await svc.slug_exists(db, slug):
         raise HTTPException(status_code=409, detail=f"Slug '{slug}' is already taken.")
 
-    fields = body.model_dump(exclude={"slug"})
+    fields = body.model_dump(exclude={"slug", "steps"})
+    steps = [step.model_dump(exclude={"position"}) for step in body.steps]
     try:
-        wizard = await svc.create_wizard(db, slug=slug, **fields)
+        wizard = await svc.create_wizard(db, slug=slug, steps=steps, **fields)
     except IntegrityError:
         await db.rollback()
         raise HTTPException(status_code=409, detail=f"Slug '{slug}' is already taken.")
 
     base = await _wizard_admin_out(db, wizard)
-    return WizardAdminDetailOut(**base.model_dump(), steps=[])
+    created = await svc.list_steps(db, wizard.id)
+    return WizardAdminDetailOut(
+        **base.model_dump(), steps=[StepAdminOut.model_validate(s) for s in created]
+    )
+
+
+# The drafter designs workflows, it does not run them.
+_DRAFT_SYSTEM = (
+    "You design guided workflows for an academic research assistant used by "
+    "Persian- and English-speaking researchers. You write precise, practical "
+    "instructions for the assistant and natural titles in both English and "
+    "Persian. Output JSON only."
+)
+
+
+def _tool_catalog() -> List[tuple]:
+    """``(signature, first line of description)`` for every tool the agent has."""
+    from app.agents.tools import default_tools
+
+    catalog = []
+    for tool in default_tools(include_task_planner=True):
+        desc = " ".join((tool.description or "").split())
+        first = desc.split(". ")[0].rstrip(".")
+        args = ", ".join((tool.args or {}).keys())
+        catalog.append((f"{tool.name}({args})", first[:160]))
+    return catalog
+
+
+def _tool_vocabulary(catalog: Sequence[tuple]) -> List[str]:
+    """Tool names plus their argument names: what a prompt may backtick."""
+    from app.agents.tools import default_tools
+
+    names = [signature.split("(", 1)[0] for signature, _ in catalog]
+    for tool in default_tools(include_task_planner=True):
+        names.extend((tool.args or {}).keys())
+    return names
+
+
+@router.post("/admin/wizards/draft", response_model=WizardDraftOut)
+async def admin_draft_wizard(
+    body: WizardDraftRequest,
+    _: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> WizardDraftOut:
+    """
+    Draft a whole wizard with AI from the admin's description of it.
+
+    Returns a proposal only — nothing is saved. The admin edits it and then
+    creates it with ``POST /admin/wizards`` (which accepts ``steps``). The slug
+    is already de-duplicated against existing wizards. Admin tooling, so the
+    call is not billed.
+    """
+    catalog = _tool_catalog()
+    prompt = svc.build_wizard_draft_prompt(
+        goal=body.goal,
+        audience=body.audience,
+        step_count=body.step_count,
+        max_messages=body.max_messages,
+        tools=catalog,
+    )
+    try:
+        llm = ChatOpenAI(
+            model=settings.OPENAI_MODEL,
+            api_key=settings.OPENAI_API_KEY,
+            temperature=0.4,
+        )
+        resp = await llm.ainvoke(
+            [SystemMessage(content=_DRAFT_SYSTEM), HumanMessage(content=prompt)]
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"The drafting model failed: {e}")
+
+    content = resp.content if isinstance(resp.content, str) else str(resp.content)
+    try:
+        draft = svc.parse_wizard_draft(
+            content,
+            known_names=_tool_vocabulary(catalog),
+            default_max_messages=body.max_messages or svc.DRAFT_DEFAULT_MAX_MESSAGES,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    fields = dict(draft.fields)
+    base_slug = fields["slug"] or "workflow"
+    fields["slug"] = svc.unique_slug(
+        base_slug, await svc.slugs_starting_with(db, base_slug)
+    )
+    return WizardDraftOut(
+        **fields,
+        steps=[StepDraftOut(**step) for step in draft.steps],
+        warnings=draft.warnings,
+    )
 
 
 @router.patch("/admin/wizards/{wizard_id}", response_model=WizardAdminDetailOut)

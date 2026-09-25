@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
+from app.repositories.llm import agent_chat_kwargs
 from langchain_core.tools import BaseTool
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.callbacks import get_usage_metadata_callback
@@ -44,6 +45,9 @@ class BaseAgent:
             model=settings.OPENAI_MODEL,
             api_key=settings.OPENAI_API_KEY,
             temperature=0,
+            # Tools are bound to this model by create_agent — see the helper for
+            # why reasoning models need an explicit effort / Responses API here.
+            **agent_chat_kwargs(),
         )
         self.agent = create_agent(
             model=self.llm,
