@@ -378,7 +378,7 @@ UI: the **Site** tab of `AdminPage.jsx` (`SiteSettingsPanel.jsx`).
   pay-as-you-go), a closing sign-up CTA, and SEO metadata (meta description,
   Open Graph/Twitter, JSON-LD, localised `<title>`).
 - **SEO** — public pages are server-rendered HTML with per-language URLs,
-  canonical + `hreflang` alternates, `WebApplication` / `HowTo` JSON-LD, a
+  canonical + `hreflang` alternates, a branded Open Graph image (`summary_large_image`), `Organization` / `WebSite` / `SoftwareApplication` / `HowTo` JSON-LD, self-hosted fonts, a
   dynamic `sitemap.xml` listing every published wizard in both languages, and
   `robots.txt`; the signed-in app is `noindex`.
 - **Suggested questions** — on request, three follow-up questions tailored to the

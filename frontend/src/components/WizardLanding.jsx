@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { localePath, translate } from "../i18n/strings.js";
-import { jsonLdScript, webApplicationJsonLd } from "../lib/seo.js";
+import { jsonLdScript, siteJsonLd } from "../lib/seo.js";
 import LangToggle from "./LangToggle.jsx";
 import LegacyHashRedirect from "./LegacyHashRedirect.jsx";
 import { AppLink, MyRunsLink } from "./UserAware.jsx";
@@ -53,7 +53,7 @@ export default function WizardLanding({ lang, wizards, error }) {
       <LegacyHashRedirect />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={jsonLdScript(webApplicationJsonLd(lang))}
+        dangerouslySetInnerHTML={jsonLdScript(siteJsonLd(lang))}
       />
 
       <header className="wz-topbar">

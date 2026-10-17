@@ -1573,12 +1573,12 @@ button.ghost {
    bottom only patches the older, physically-positioned chat chrome.
    ---------------------------------------------------------------------- */
 :root {
-  --font-display: "Crimson Pro", Georgia, "Times New Roman", serif;
+  --font-display: var(--nf-crimson, "Crimson Pro"), Georgia, "Times New Roman", serif;
   /* Deliberately self-contained — must NOT reference var(--font). The RTL block
      below points --font at this one, and a custom-property cycle makes BOTH
      invalid at computed-value time, dropping the whole Persian UI to the
      browser's default serif. */
-  --font-fa: "Vazirmatn", "Segoe UI", Tahoma, Arial, sans-serif;
+  --font-fa: var(--nf-vazirmatn, "Vazirmatn"), "Segoe UI", Tahoma, Arial, sans-serif;
 
   --wz-surface: #141824;
   --wz-surface-2: #1a2030;

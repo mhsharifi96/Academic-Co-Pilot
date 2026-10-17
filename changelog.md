@@ -7,6 +7,16 @@ All notable changes to this project. Format loosely follows
 Work in progress on the current branch (`main`) — not yet committed. Adds the
 authentication and persistence layer on top of the original agent MVP:
 ### Changed
+- **SEO follow-ups.** Branded 1200x630 `og-image.png` (+ 512px `logo.png`,
+  regenerate with `frontend/scripts/make_og_image.py`) on every public page,
+  `twitter:card` is now `summary_large_image`. Landing JSON-LD is an `@graph`
+  of `Organization`, `WebSite` and `SoftwareApplication` (`EducationalApplication`;
+  offers = free sign-up with `DEFAULT_USER_BALANCE` starter credit and wallet
+  top-ups from `TOPUP_AMOUNTS` — values mirrored in `frontend/src/lib/seo.js`,
+  keep in sync; per-use token prices left as a TODO). Fonts are self-hosted via
+  `next/font` (Crimson Pro preloaded, Vazirmatn not), `font-display: swap` with
+  size-adjusted fallbacks; the render-blocking Google Fonts stylesheet and the
+  unused Atkinson Hyperlegible face are gone.
 - **Frontend migrated from Vite + React SPA to Next.js 15 (App Router) for
   SEO.** The landing page and wizard pages are now server-rendered HTML with
   per-language URLs (`/`, `/wizards/[slug]`, Persian at `/fa/...`), two root
