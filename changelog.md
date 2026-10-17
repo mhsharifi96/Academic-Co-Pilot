@@ -7,6 +7,31 @@ All notable changes to this project. Format loosely follows
 Work in progress on the current branch (`main`) — not yet committed. Adds the
 authentication and persistence layer on top of the original agent MVP:
 ### Added
+- **Landing page: "Why Academic Co-Pilot" and "Pay only for what you use"
+  sections, plus SEO.** `WizardLanding.jsx` gains a six-point benefits grid, a
+  four-step wallet top-up guide (amounts and networks mirror
+  `topup_service.TOPUP_AMOUNTS` / `CRYPTO_NETWORKS` — keep the
+  `landing.charge3Body` string in sync), a closing CTA band and topbar section
+  links. `index.html` now carries a descriptive title, meta description,
+  Open Graph/Twitter tags, `WebApplication` JSON-LD and a `<noscript>`
+  fallback; the page sets a localised `<title>`/description per language.
+  New `public/favicon.svg` and `public/robots.txt` (disallows `/api/`).
+- **Cloudflare Turnstile CAPTCHA on login and sign-up.** Enforced when
+  `TURNSTILE_SECRET` is set; `GET /auth/config` hands the browser
+  `turnstile_site_key`, `LoginPage.jsx` renders `Turnstile.jsx` (actions
+  `login` / `signup`, reset after every attempt), and `auth.py` verifies the
+  token via siteverify (action + `TURNSTILE_HOSTNAMES` check, fails closed)
+  before touching the account. `app/services/turnstile_service.py`,
+  `tests/test_turnstile.py`.
+- **Balance top-up requests (crypto).** The balance chip opens a request form
+  (email, $5/$10/$20/$30, crypto network). Admin emails the wallet address from
+  the new *Top-ups* admin tab (SMTP via `SMTP_*`, `mailto:` fallback), the user
+  marks it paid, the admin confirms and the balance is credited. New
+  `topup_requests` table, `app/api/v1/endpoints/billing.py`,
+  `app/services/topup_service.py`, `tests/test_topup.py`.
+### Changed
+- New accounts start with `$0.07` (`DEFAULT_USER_BALANCE`, was `$0.50`).
+- The 402 "balance exhausted" message points users at the top-up form.
 - **Create a workflow with AI (admin panel).** A *Create with AI* button next
   to *New workflow* opens `WizardGenerator.jsx`. The admin describes the goal,
   the intended users, the number of steps (or leaves it to the AI) and a message
@@ -49,6 +74,8 @@ authentication and persistence layer on top of the original agent MVP:
     3 authors + "et al." `resolve_citation` still returns full author lists.
 
 ### Fixed
+- **"Browse workflows" no longer opens the app.** Its `href="#catalog"` was
+  parsed by the hash router as an unknown route; in-page links now scroll.
 - **Markdown tables in agent replies rendered as one run-on paragraph.**
   `react-markdown` was used without `remark-gfm`, so GFM pipe tables were not
   parsed. `Message.jsx` and `GuidelinesPage.jsx` now pass `remarkGfm`; tables

@@ -2,14 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 import * as api from "../api.js";
 import { useT } from "../i18n.js";
 import SiteSettingsPanel from "./SiteSettingsPanel.jsx";
+import TopUpAdminPanel from "./TopUpAdminPanel.jsx";
 import WizardAdminPanel from "./WizardAdminPanel.jsx";
 
-// Admin console, split into tabs: user balances, guided workflows, and
-// site-wide switches. Only rendered when the logged-in user has
+// Admin console, split into tabs: user balances, top-up requests, guided
+// workflows, and site-wide switches. Only rendered when the logged-in user has
 // is_admin === true (gated in App.jsx / SessionBar).
 export default function AdminPage({ onBack, currentUserId }) {
   const { t } = useT();
-  const [tab, setTab] = useState("users"); // "users" | "wizards" | "site"
+  const [tab, setTab] = useState("users"); // "users" | "topups" | "wizards" | "site"
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -115,6 +116,14 @@ export default function AdminPage({ onBack, currentUserId }) {
           </button>
           <button
             role="tab"
+            aria-selected={tab === "topups"}
+            className={`admin-tab${tab === "topups" ? " active" : ""}`}
+            onClick={() => setTab("topups")}
+          >
+            Top-ups
+          </button>
+          <button
+            role="tab"
             aria-selected={tab === "wizards"}
             className={`admin-tab${tab === "wizards" ? " active" : ""}`}
             onClick={() => setTab("wizards")}
@@ -131,7 +140,9 @@ export default function AdminPage({ onBack, currentUserId }) {
           </button>
         </div>
 
-        {tab === "wizards" ? (
+        {tab === "topups" ? (
+          <TopUpAdminPanel />
+        ) : tab === "wizards" ? (
           <WizardAdminPanel />
         ) : tab === "site" ? (
           <SiteSettingsPanel />

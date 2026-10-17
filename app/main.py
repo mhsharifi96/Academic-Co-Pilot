@@ -9,6 +9,7 @@ from app.api.v1.endpoints import (
     files,
     auth,
     admin,
+    billing,
     downloads,
     wizard,
 )
@@ -76,6 +77,7 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
 app.include_router(admin.router, prefix="/api/v1", tags=["admin"])
+app.include_router(billing.router, prefix="/api/v1", tags=["billing"])
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(ingestion.router, prefix="/api/v1", tags=["ingestion"])
 app.include_router(sessions.router, prefix="/api/v1", tags=["sessions"])

@@ -1672,6 +1672,45 @@ html[dir="rtl"] {
   gap: var(--space-2);
 }
 
+/* Landing-page section links. Hidden on phones, where the hero CTA and plain
+   scrolling cover the same ground and the topbar has no room. */
+.wz-topnav {
+  margin-inline-start: auto;
+  display: flex;
+  gap: var(--space-1);
+}
+.wz-topnav + .wz-topbar-actions {
+  margin-inline-start: 0;
+}
+.wz-topnav-link {
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.wz-topnav-link:hover {
+  color: var(--text);
+  background: var(--wz-surface-2);
+}
+.wz-topnav-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (max-width: 720px) {
+  .wz-topnav {
+    display: none;
+  }
+  .wz-topnav + .wz-topbar-actions {
+    margin-inline-start: auto;
+  }
+}
+
 /* Wallet chip. Inherits the colours of the chat screen's `.user-balance`
    (green, red once exhausted) and only adds the label + runner spacing. */
 .wz-balance {
@@ -2094,6 +2133,122 @@ html[dir="rtl"] .wz-eyebrow {
 .wz-how-icon {
   color: var(--accent);
   display: inline-flex;
+}
+
+/* ---------- "Why us" ---------- */
+/* Section targets clear the sticky topbar when scrolled to. */
+.wz-landing .wz-section[id] {
+  scroll-margin-block-start: 72px;
+}
+.wz-why-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--space-3);
+}
+.wz-why-item {
+  padding: var(--space-4);
+  border: 1px solid var(--wz-border);
+  border-radius: 14px;
+  background: linear-gradient(160deg, var(--wz-surface-2), var(--wz-surface));
+  transition: border-color 0.2s var(--ease-out), transform 0.2s var(--ease-out);
+}
+.wz-why-item:hover {
+  border-color: var(--wz-border-strong);
+  transform: translateY(-2px);
+}
+.wz-why-item h3 {
+  margin: var(--space-3) 0 var(--space-1);
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+}
+.wz-why-item p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+.wz-why-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  color: var(--accent);
+  background: var(--wz-glow);
+}
+
+/* ---------- Top-up / pricing ---------- */
+.wz-charge-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.wz-charge-badge {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  color: var(--green);
+  background: rgba(46, 204, 113, 0.12);
+  border: 1px solid rgba(46, 204, 113, 0.3);
+}
+.wz-charge-list {
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+.wz-charge-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3);
+  border: 1px solid rgba(241, 196, 15, 0.35);
+  border-radius: 10px;
+  background: rgba(241, 196, 15, 0.07);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+.wz-charge-note .wz-icon {
+  flex: none;
+  margin-block-start: 2px;
+  color: #f1c40f;
+}
+
+/* ---------- Closing call to action ---------- */
+.wz-cta-band {
+  margin-block-end: var(--space-5);
+  text-align: center;
+  display: grid;
+  justify-items: center;
+  border: 1px solid var(--wz-border);
+  border-radius: 18px;
+  background:
+    radial-gradient(30rem 12rem at 50% 0, var(--wz-glow), transparent 70%),
+    var(--wz-surface);
+  width: calc(100% - 2 * var(--space-4));
+}
+.wz-cta-band .wz-section-sub {
+  margin-inline: auto;
+}
+@media (max-width: 640px) {
+  .wz-charge-head {
+    flex-direction: column;
+  }
+  .wz-cta-band {
+    width: calc(100% - 2 * var(--space-3));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wz-why-item {
+    transition: none;
+  }
+  .wz-why-item:hover {
+    transform: none;
+  }
 }
 
 .wz-footer {
@@ -3243,4 +3398,231 @@ html[dir="rtl"] .suggest-detail {
   .suggest-caret {
     transition: none;
   }
+}
+
+/* ---------- Balance top-up (crypto) ---------- */
+/* The balance chip doubles as the entry point to the top-up modal. */
+button.balance-btn {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+button.balance-btn:hover {
+  filter: brightness(1.15);
+}
+.balance-plus {
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+.topup-card {
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.topup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.topup-head h4 {
+  margin: 0;
+}
+.topup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.topup-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.topup-field input,
+.topup-field select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 14px;
+}
+.topup-field input:focus,
+.topup-field select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.topup-amounts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.topup-amount {
+  padding: 10px 0;
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+}
+.topup-amount.active {
+  border-color: var(--accent);
+  background: rgba(91, 140, 255, 0.16);
+  color: var(--text);
+}
+.topup-notice {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text);
+  background: rgba(245, 166, 35, 0.1);
+  border: 1px solid rgba(245, 166, 35, 0.35);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.topup-open {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.topup-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  counter-reset: topup;
+}
+.topup-steps li {
+  counter-increment: topup;
+  font-size: 11.5px;
+  color: var(--muted);
+  border-top: 3px solid var(--border);
+  padding-top: 6px;
+}
+.topup-steps li::before {
+  content: counter(topup) ". ";
+}
+.topup-steps li.done {
+  border-color: var(--green);
+  color: var(--text);
+}
+.topup-steps li.current {
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 700;
+}
+.topup-explain,
+.topup-note {
+  font-size: 13px;
+  margin: 0;
+  color: var(--text);
+}
+.topup-note code {
+  word-break: break-all;
+}
+.topup-history {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.topup-history summary {
+  cursor: pointer;
+}
+.topup-history ul {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.topup-history li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.topup-status {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.topup-history .topup-status {
+  margin-inline-start: auto;
+}
+.topup-status.s-pending,
+.topup-status.s-awaiting_payment {
+  color: var(--amber);
+  border-color: rgba(245, 166, 35, 0.4);
+}
+.topup-status.s-paid {
+  color: var(--accent);
+  border-color: rgba(91, 140, 255, 0.45);
+}
+.topup-status.s-completed {
+  color: var(--green);
+  border-color: rgba(46, 204, 113, 0.4);
+}
+.topup-status.s-rejected,
+.topup-status.s-cancelled {
+  color: var(--muted);
+}
+
+/* Admin "Top-ups" tab */
+.topup-filter {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.topup-admin-notice {
+  font-size: 13px;
+  border: 1px solid rgba(46, 204, 113, 0.4);
+  background: rgba(46, 204, 113, 0.08);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+.topup-admin-notice a {
+  color: var(--accent);
+}
+.topup-payment {
+  min-width: 220px;
+}
+.topup-admin-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.topup-sub {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+  word-break: break-all;
+}
+@media (max-width: 520px) {
+  .topup-amounts,
+  .topup-steps {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Cloudflare Turnstile widget on the login card. */
+.turnstile-box {
+  display: flex;
+  justify-content: center;
+  min-height: 65px;
 }

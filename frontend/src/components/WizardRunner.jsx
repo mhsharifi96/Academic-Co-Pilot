@@ -7,6 +7,7 @@ import InterruptCard from "./InterruptCard.jsx";
 import LangToggle from "./LangToggle.jsx";
 import Message from "./Message.jsx";
 import SuggestedQuestions from "./SuggestedQuestions.jsx";
+import TopUpModal from "./TopUpModal.jsx";
 import Icon from "./Icon.jsx";
 import WizardStepper from "./WizardStepper.jsx";
 
@@ -43,6 +44,7 @@ export default function WizardRunner({ runId }) {
     const b = auth.getUser()?.balance;
     return typeof b === "number" ? b : null;
   });
+  const [topUpOpen, setTopUpOpen] = useState(false);
 
   // Files uploaded into this run. They live on the run's backing ChatSession,
   // so the agent picks them up through the per-turn context without the
@@ -312,13 +314,16 @@ export default function WizardRunner({ runId }) {
         <span className="wz-runner-title">{run?.wizard_title || ""}</span>
         <div className="wz-topbar-actions">
           {balance !== null && (
-            <span
-              className={`user-balance wz-balance${balance <= 0 ? " empty" : ""}`}
-              title={t("runner.balanceHint")}
+            <button
+              type="button"
+              className={`user-balance wz-balance balance-btn${balance <= 0 ? " empty" : ""}`}
+              title={`${t("runner.balanceHint")} ${t("topup.chipHint")}`}
+              onClick={() => setTopUpOpen(true)}
             >
               <span className="wz-balance-label">{t("runner.balance")}</span>
               <span className="wz-balance-value">${balance.toFixed(3)}</span>
-            </span>
+              <span className="balance-plus" aria-hidden="true">+</span>
+            </button>
           )}
           <LangToggle compact />
           {!done && !abandoned && (
@@ -488,6 +493,9 @@ export default function WizardRunner({ runId }) {
             </button>
           </div>
         </div>
+      )}
+      {topUpOpen && (
+        <TopUpModal onClose={() => setTopUpOpen(false)} onBalance={applyBalance} />
       )}
     </div>
   );

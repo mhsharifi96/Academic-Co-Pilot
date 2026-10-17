@@ -326,6 +326,7 @@ function ChatApp({ user, setUser }) {
         onNavigate={(next) => (next === "wizards" ? navigate("/") : setView(next))}
         user={user}
         onLogout={handleLogout}
+        onBalance={(balance) => setUser((u) => (u ? auth.patchUser({ balance }) : u))}
       />
 
       {view === "guidelines" ? (

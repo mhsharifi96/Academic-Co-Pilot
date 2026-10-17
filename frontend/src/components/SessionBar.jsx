@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { navigate } from "../router.js";
 import { useT } from "../i18n.js";
 import LangToggle from "./LangToggle.jsx";
+import TopUpModal from "./TopUpModal.jsx";
 
 export default function SessionBar({
   sessionId,
@@ -9,8 +11,10 @@ export default function SessionBar({
   onNavigate,
   user,
   onLogout,
+  onBalance,
 }) {
   const { t } = useT();
+  const [topUpOpen, setTopUpOpen] = useState(false);
   const shortId = sessionId
     ? sessionId.length > 14
       ? `${sessionId.slice(0, 8)}…${sessionId.slice(-4)}`
@@ -69,18 +73,24 @@ export default function SessionBar({
           {shortId}
         </span>
         {user && typeof user.balance === "number" && (
-          <span
-            className={`user-balance${user.balance <= 0 ? " empty" : ""}`}
-            title="Remaining balance"
+          <button
+            type="button"
+            className={`user-balance balance-btn${user.balance <= 0 ? " empty" : ""}`}
+            title={t("topup.chipHint")}
+            onClick={() => setTopUpOpen(true)}
           >
             ${user.balance.toFixed(3)}
-          </span>
+            <span className="balance-plus" aria-hidden="true">+</span>
+          </button>
         )}
         {user && <span className="user-email" title={user.email}>{user.email}</span>}
         <button className="ghost" onClick={onLogout}>
           Log out
         </button>
       </div>
+      {topUpOpen && (
+        <TopUpModal onClose={() => setTopUpOpen(false)} onBalance={onBalance} />
+      )}
     </header>
   );
 }

@@ -281,3 +281,64 @@ export async function setRegistrationOpen(open) {
     body: { registration_open: open },
   });
 }
+
+// ----- Balance top-ups (paid in crypto) -----
+//
+// Flow: the user requests a top-up → an admin emails the wallet address for the
+// chosen network → the user pays and marks it paid → the admin confirms, which
+// credits the balance.
+
+export async function getTopUpOptions() {
+  return request("/billing/topup-options");
+}
+
+export async function listMyTopUps() {
+  return request("/billing/topup-requests");
+}
+
+export async function createTopUp({ email, amount, network }) {
+  return request("/billing/topup-requests", {
+    method: "POST",
+    body: { email, amount, network },
+  });
+}
+
+export async function markTopUpPaid(requestId, txHash) {
+  return request(`/billing/topup-requests/${encodeURIComponent(requestId)}/paid`, {
+    method: "POST",
+    body: { tx_hash: txHash || undefined },
+  });
+}
+
+export async function cancelTopUp(requestId) {
+  return request(`/billing/topup-requests/${encodeURIComponent(requestId)}/cancel`, {
+    method: "POST",
+  });
+}
+
+export async function adminListTopUps(status) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+  return request(`/admin/topup-requests${qs}`);
+}
+
+// Returns { request, email_sent, email_error, mailto }.
+export async function adminSendTopUpEmail(requestId, { walletAddress, note }) {
+  return request(
+    `/admin/topup-requests/${encodeURIComponent(requestId)}/send-payment-email`,
+    { method: "POST", body: { wallet_address: walletAddress, note: note || undefined } }
+  );
+}
+
+// Credits the user's balance. Returns { request, user_balance }.
+export async function adminConfirmTopUp(requestId) {
+  return request(`/admin/topup-requests/${encodeURIComponent(requestId)}/confirm`, {
+    method: "POST",
+  });
+}
+
+export async function adminRejectTopUp(requestId, reason) {
+  return request(`/admin/topup-requests/${encodeURIComponent(requestId)}/reject`, {
+    method: "POST",
+    body: { reason: reason || undefined },
+  });
+}

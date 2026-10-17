@@ -71,8 +71,14 @@ async function post(path, body) {
   return data;
 }
 
-export async function login(email, password) {
-  const data = await post("/auth/login", { email, password });
+// `turnstileToken` is the CAPTCHA token, required only when the backend
+// enforces Turnstile (GET /auth/config returns a turnstile_site_key).
+export async function login(email, password, turnstileToken) {
+  const data = await post("/auth/login", {
+    email,
+    password,
+    turnstile_token: turnstileToken || undefined,
+  });
   store(data.access_token, data.user);
   return data.user;
 }
@@ -90,8 +96,12 @@ export async function fetchAuthConfig() {
   }
 }
 
-export async function register(email, password) {
-  const data = await post("/auth/register", { email, password });
+export async function register(email, password, turnstileToken) {
+  const data = await post("/auth/register", {
+    email,
+    password,
+    turnstile_token: turnstileToken || undefined,
+  });
   store(data.access_token, data.user);
   return data.user;
 }

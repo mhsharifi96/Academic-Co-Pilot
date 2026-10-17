@@ -59,6 +59,31 @@ class Settings(BaseSettings):
     # the "first account to register becomes admin" fallback in auth.register.
     ADMIN_EMAIL: Optional[str] = None
 
+    # ---- Cloudflare Turnstile (CAPTCHA on login / sign-up) -----------------
+    # Site key is public — sent to the browser via GET /auth/config. The secret
+    # is a BACKEND SECRET used only for siteverify. The CAPTCHA is enforced only
+    # when TURNSTILE_SECRET is set. TURNSTILE_HOSTNAMES is the comma-separated
+    # list of frontend hostnames a token may come from (siteverify's
+    # ``hostname``); in production it must not include localhost / 127.0.0.1.
+    TURNSTILE_SITE_KEY: Optional[str] = "0x4AAAAAAFZKGAU2CuTlYM5b"
+    TURNSTILE_SECRET: Optional[str] = None
+    TURNSTILE_HOSTNAMES: str = ""
+
+    # ---- Outgoing email (balance top-up payment instructions) --------------
+    # When SMTP_HOST is set, the admin's "Send payment email" action mails the
+    # wallet address to the user directly. When unset, the request is still
+    # marked as awaiting payment and the admin UI falls back to a mailto: link
+    # so the admin can send the same message from their own mail client.
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    # Sender address; falls back to SMTP_USER when unset.
+    SMTP_FROM: Optional[str] = None
+    # STARTTLS on SMTP_PORT (587). Set SMTP_USE_SSL=true instead for port 465.
+    SMTP_USE_TLS: bool = True
+    SMTP_USE_SSL: bool = False
+
     # Authentication (JWT)
     JWT_SECRET: str = "change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
@@ -77,7 +102,7 @@ class Settings(BaseSettings):
     # metering entirely (useful for local development / the test suite).
     ENABLE_BILLING: bool = True
     # Dollars granted to a brand-new account.
-    DEFAULT_USER_BALANCE: float = 0.5
+    DEFAULT_USER_BALANCE: float = 0.07
     # A user is blocked from starting a new turn once balance <= this value.
     MIN_BALANCE_TO_CHAT: float = 0.0
     # Token prices in USD per 1,000,000 tokens, used to convert measured token

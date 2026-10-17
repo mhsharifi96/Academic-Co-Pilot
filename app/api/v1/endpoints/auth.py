@@ -1,6 +1,8 @@
 """Authentication endpoints: register, login, and current-user."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +16,8 @@ from app.core.security import (
     verify_password,
 )
 from app.models.auth import User
+from app.core.config import settings
+from app.services import turnstile_service
 from app.services.site_settings_service import (
     get_site_settings,
     registration_allowed,
@@ -25,6 +29,9 @@ router = APIRouter()
 class Credentials(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6, max_length=128)
+    # Cloudflare Turnstile token from the widget; required only when the
+    # CAPTCHA is enforced (TURNSTILE_SECRET set).
+    turnstile_token: Optional[str] = Field(default=None, max_length=2048)
 
 
 class UserOut(BaseModel):
@@ -53,6 +60,25 @@ class AuthConfigOut(BaseModel):
     """Public flags the login screen needs before anyone is signed in."""
 
     registration_open: bool
+    # Public Turnstile site key when the CAPTCHA is enforced, else null (the
+    # login screen then renders no widget).
+    turnstile_site_key: Optional[str] = None
+
+
+async def _require_captcha(request: Request, creds: Credentials, action: str) -> None:
+    """403 unless the request carries a valid Turnstile token for ``action``."""
+    if not turnstile_service.turnstile_enabled():
+        return
+    # nginx forwards the browser's address as X-Real-IP; it's only a hint to
+    # Cloudflare, so a missing or odd value is harmless.
+    remote_ip = request.headers.get("x-real-ip") or (
+        request.client.host if request.client else None
+    )
+    if not await turnstile_service.verify_token(creds.turnstile_token, action, remote_ip):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="CAPTCHA check failed. Please complete the challenge and try again.",
+        )
 
 
 @router.get("/auth/config", response_model=AuthConfigOut)
@@ -63,12 +89,18 @@ async def auth_config(db: AsyncSession = Depends(get_db)):
     return AuthConfigOut(
         registration_open=registration_allowed(
             settings_row.registration_open, user_count or 0
-        )
+        ),
+        turnstile_site_key=(
+            settings.TURNSTILE_SITE_KEY if turnstile_service.turnstile_enabled() else None
+        ),
     )
 
 
 @router.post("/auth/register", response_model=TokenResponse, status_code=201)
-async def register(creds: Credentials, db: AsyncSession = Depends(get_db)):
+async def register(
+    creds: Credentials, request: Request, db: AsyncSession = Depends(get_db)
+):
+    await _require_captcha(request, creds, turnstile_service.ACTION_SIGNUP)
     existing = await get_user_by_email(db, creds.email)
     if existing:
         raise HTTPException(
@@ -105,7 +137,10 @@ async def register(creds: Credentials, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/auth/login", response_model=TokenResponse)
-async def login(creds: Credentials, db: AsyncSession = Depends(get_db)):
+async def login(
+    creds: Credentials, request: Request, db: AsyncSession = Depends(get_db)
+):
+    await _require_captcha(request, creds, turnstile_service.ACTION_LOGIN)
     user = await get_user_by_email(db, creds.email)
     if user is None or not verify_password(creds.password, user.hashed_password):
         raise HTTPException(

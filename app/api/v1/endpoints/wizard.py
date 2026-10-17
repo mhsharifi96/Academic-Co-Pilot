@@ -393,8 +393,8 @@ async def post_turn(
         raise HTTPException(
             status_code=402,
             detail=(
-                "Your balance is exhausted. Please contact an administrator to "
-                "top up your account before continuing."
+                "Your balance is exhausted. Click your balance to request a "
+                "top-up before continuing."
             ),
         )
 
@@ -524,8 +524,8 @@ async def suggest_questions(
         raise HTTPException(
             status_code=402,
             detail=(
-                "Your balance is exhausted. Please contact an administrator to "
-                "top up your account before continuing."
+                "Your balance is exhausted. Click your balance to request a "
+                "top-up before continuing."
             ),
         )
 

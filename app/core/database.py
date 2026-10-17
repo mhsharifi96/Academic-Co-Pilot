@@ -146,8 +146,13 @@ async def init_models() -> None:
             text(
                 "ALTER TABLE users "
                 "ADD COLUMN IF NOT EXISTS balance DOUBLE PRECISION "
-                "NOT NULL DEFAULT 0.5"
+                "NOT NULL DEFAULT 0.07"
             )
+        )
+        # Keep the column default in step with DEFAULT_USER_BALANCE on databases
+        # created back when new accounts started at $0.50.
+        await conn.execute(
+            text("ALTER TABLE users ALTER COLUMN balance SET DEFAULT 0.07")
         )
         await conn.execute(
             text(

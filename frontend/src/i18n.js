@@ -46,6 +46,54 @@ const STRINGS = {
     "landing.how3Body":
       "Your whole conversation is saved, so you can leave and come back where you stopped.",
     "landing.footer": "Academic Co-Pilot",
+    "landing.navLabel": "Page sections",
+    "landing.navWhy": "Why us",
+    "landing.navWorkflows": "Workflows",
+    "landing.navPricing": "Pricing",
+    "landing.whyTitle": "Why researchers use Academic Co-Pilot",
+    "landing.whySubtitle":
+      "One assistant for the whole paper — from the first search to the last citation — built around how academic work is actually done.",
+    "landing.why1Title": "Citations you can trust",
+    "landing.why1Body":
+      "Drafts are grounded in the papers you ingest, not invented. References come out in IEEE, APA or Vancouver style.",
+    "landing.why2Title": "Faster literature screening",
+    "landing.why2Body":
+      "Drop in a database export and get a colour-coded spreadsheet of relevant, maybe and excluded abstracts in minutes.",
+    "landing.why3Title": "Your PDFs become a knowledge base",
+    "landing.why3Body":
+      "Upload papers once; the assistant searches them for every answer and every section it writes.",
+    "landing.why4Title": "Data analysis built in",
+    "landing.why4Body":
+      "Ask questions about your CSV data and get statistics and publication-ready charts from a secure sandbox.",
+    "landing.why5Title": "Guided, not overwhelming",
+    "landing.why5Body":
+      "Step-by-step workflows keep each stage focused, and your progress is saved so you can stop and resume any time.",
+    "landing.why6Title": "English and Persian",
+    "landing.why6Body":
+      "The full interface works in both languages, with proper right-to-left layout for Persian.",
+    "landing.chargeTitle": "Pay only for what you use",
+    "landing.chargeSubtitle":
+      "No subscription and no card required. Every new account starts with free credit; each message is billed by its actual usage, and you top up your wallet whenever you need more.",
+    "landing.charge1Title": "Create a free account",
+    "landing.charge1Body": "Sign up and receive starter credit to try the assistant right away.",
+    "landing.charge2Title": "Open your wallet",
+    "landing.charge2Body":
+      "Click the balance chip at the top of the app and choose “Increase balance”.",
+    "landing.charge3Title": "Choose amount and network",
+    "landing.charge3Body":
+      "Pick $5, $10, $20 or $30 and a crypto network: USDT (TRC-20, ERC-20, BEP-20, TON), BTC, ETH, TRX or TON.",
+    "landing.charge4Title": "Pay and confirm",
+    "landing.charge4Body":
+      "We email you the wallet address. Send the payment, press “I've paid”, and your balance is credited once the transfer is confirmed.",
+    "landing.chargeNote":
+      "Send the exact amount on the network you chose only — payments sent on another network cannot be recovered.",
+    "landing.chargeCta": "Create a free account",
+    "landing.ctaTitle": "Start your next paper today",
+    "landing.ctaBody": "Free starter credit. No subscription. Top up only when you need to.",
+    "landing.metaTitle":
+      "Academic Co-Pilot — AI research assistant for literature review & paper drafting",
+    "landing.metaDescription":
+      "AI research assistant that guides you from a research goal to a finished draft: screen literature, ingest PDFs, draft papers with real citations, and analyse your data. Pay as you go.",
 
     "wizard.steps_one": "{n} step",
     "wizard.steps_other": "{n} steps",
@@ -199,6 +247,36 @@ const STRINGS = {
     "common.retry": "Try again",
     "common.required": "Required",
     "common.loading": "Loading…",
+
+    "topup.title": "Increase balance",
+    "topup.chipHint": "Click to request more credit.",
+    "topup.intro": "Choose an amount and the crypto network you'll pay on. We'll email you the wallet address to pay to.",
+    "topup.email": "Email for payment details",
+    "topup.amount": "Amount (USD)",
+    "topup.network": "Payment network",
+    "topup.cryptoNotice": "Payment is made in cryptocurrency. After you submit, an administrator emails you the wallet address for the network you chose. Send the payment, then come back here and press “I've paid”. Your balance is credited once the transfer is confirmed.",
+    "topup.submit": "Request top-up",
+    "topup.sending": "Sending…",
+    "topup.errEmail": "Enter an email address.",
+    "topup.wallet": "Pay to",
+    "topup.txHash": "Transaction hash",
+    "topup.txHashHint": "Optional — helps us find your payment",
+    "topup.markPaid": "I've paid",
+    "topup.cancelRequest": "Cancel request",
+    "topup.history": "Previous requests",
+    "topup.step.pending": "Requested",
+    "topup.step.awaiting_payment": "Payment details sent",
+    "topup.step.paid": "Paid",
+    "topup.step.completed": "Credited",
+    "topup.explain.pending": "Your request is in. An administrator will email you the wallet address for your network shortly.",
+    "topup.explain.awaiting_payment": "We've emailed you the payment details (also shown below). Send the exact amount on the chosen network only, then press “I've paid”.",
+    "topup.explain.paid": "Thanks! We're checking the transfer. Your balance is credited as soon as it's confirmed.",
+    "topup.status.pending": "Requested",
+    "topup.status.awaiting_payment": "Awaiting payment",
+    "topup.status.paid": "Paid",
+    "topup.status.completed": "Credited",
+    "topup.status.rejected": "Rejected",
+    "topup.status.cancelled": "Cancelled",
   },
 
   fa: {
@@ -234,6 +312,53 @@ const STRINGS = {
     "landing.how3Body":
       "تمام گفتگو ذخیره می‌شود؛ می‌توانید بیرون بروید و از همان‌جا ادامه دهید.",
     "landing.footer": "دستیار پژوهشی",
+    "landing.navLabel": "بخش‌های صفحه",
+    "landing.navWhy": "چرا ما",
+    "landing.navWorkflows": "مسیرها",
+    "landing.navPricing": "هزینه‌ها",
+    "landing.whyTitle": "چرا پژوهشگران از دستیار پژوهشی استفاده می‌کنند",
+    "landing.whySubtitle":
+      "یک دستیار برای کل مقاله — از نخستین جستجو تا آخرین ارجاع — طراحی‌شده بر اساس روش واقعی کار پژوهشی.",
+    "landing.why1Title": "ارجاع‌های قابل اعتماد",
+    "landing.why1Body":
+      "پیش‌نویس‌ها بر پایهٔ مقاله‌هایی است که خودتان افزوده‌اید، نه ساختگی. منابع با سبک IEEE، APA یا Vancouver ارائه می‌شوند.",
+    "landing.why2Title": "غربالگری سریع‌تر منابع",
+    "landing.why2Body":
+      "خروجی پایگاه داده را بارگذاری کنید و در چند دقیقه صفحه‌گسترده‌ای رنگ‌بندی‌شده از چکیده‌های مرتبط، محتمل و حذف‌شده بگیرید.",
+    "landing.why3Title": "PDFهای شما پایگاه دانش می‌شوند",
+    "landing.why3Body":
+      "مقاله‌ها را یک بار بارگذاری کنید؛ دستیار برای هر پاسخ و هر بخشی که می‌نویسد در آن‌ها جستجو می‌کند.",
+    "landing.why4Title": "تحلیل داده درون برنامه",
+    "landing.why4Body":
+      "دربارهٔ داده‌های CSV خود بپرسید و آمار و نمودارهای آمادهٔ انتشار را از محیطی امن دریافت کنید.",
+    "landing.why5Title": "گام‌به‌گام، بدون سردرگمی",
+    "landing.why5Body":
+      "مسیرهای گام‌به‌گام هر مرحله را متمرکز نگه می‌دارند و پیشرفت شما ذخیره می‌شود تا هر زمان ادامه دهید.",
+    "landing.why6Title": "فارسی و انگلیسی",
+    "landing.why6Body":
+      "تمام رابط کاربری به هر دو زبان کار می‌کند و چیدمان راست‌به‌چپ فارسی به‌درستی پشتیبانی می‌شود.",
+    "landing.chargeTitle": "فقط به اندازهٔ مصرف پرداخت کنید",
+    "landing.chargeSubtitle":
+      "بدون اشتراک و بدون نیاز به کارت بانکی. هر حساب تازه با اعتبار رایگان شروع می‌شود؛ هزینهٔ هر پیام بر اساس مصرف واقعی آن محاسبه می‌شود و هر زمان لازم بود کیف پول خود را شارژ می‌کنید.",
+    "landing.charge1Title": "ساخت حساب رایگان",
+    "landing.charge1Body": "ثبت‌نام کنید و اعتبار اولیه بگیرید تا همین حالا دستیار را امتحان کنید.",
+    "landing.charge2Title": "باز کردن کیف پول",
+    "landing.charge2Body":
+      "روی نشان موجودی در بالای برنامه کلیک کنید و «افزایش موجودی» را انتخاب کنید.",
+    "landing.charge3Title": "انتخاب مبلغ و شبکه",
+    "landing.charge3Body":
+      "۵، ۱۰، ۲۰ یا ۳۰ دلار و یک شبکهٔ رمزارز را انتخاب کنید: USDT (TRC-20، ERC-20، BEP-20، TON)، BTC، ETH، TRX یا TON.",
+    "landing.charge4Title": "پرداخت و تأیید",
+    "landing.charge4Body":
+      "آدرس کیف پول را برایتان ایمیل می‌کنیم. پرداخت را انجام دهید، «پرداخت کردم» را بزنید و پس از تأیید تراکنش موجودی شما افزایش می‌یابد.",
+    "landing.chargeNote":
+      "مبلغ دقیق را فقط روی شبکهٔ انتخابی بفرستید — پرداخت روی شبکهٔ دیگر قابل بازگشت نیست.",
+    "landing.chargeCta": "ساخت حساب رایگان",
+    "landing.ctaTitle": "مقالهٔ بعدی‌تان را همین امروز شروع کنید",
+    "landing.ctaBody": "اعتبار اولیهٔ رایگان. بدون اشتراک.",
+    "landing.metaTitle": "دستیار پژوهشی — هوش مصنوعی برای مرور منابع و نگارش مقاله",
+    "landing.metaDescription":
+      "دستیار پژوهشی هوشمند که شما را از هدف پژوهشی تا پیش‌نویس نهایی همراهی می‌کند: غربالگری منابع، افزودن PDF، نگارش مقاله با ارجاع واقعی و تحلیل داده. پرداخت به اندازهٔ مصرف.",
 
     "wizard.steps_one": "{n} گام",
     "wizard.steps_other": "{n} گام",
@@ -386,6 +511,36 @@ const STRINGS = {
     "common.retry": "تلاش دوباره",
     "common.required": "الزامی",
     "common.loading": "در حال بارگذاری…",
+
+    "topup.title": "افزایش موجودی",
+    "topup.chipHint": "برای درخواست اعتبار بیشتر کلیک کنید.",
+    "topup.intro": "مبلغ و شبکهٔ رمزارزی که با آن پرداخت می‌کنید را انتخاب کنید. آدرس کیف پول مقصد را برایتان ایمیل می‌کنیم.",
+    "topup.email": "ایمیل برای دریافت اطلاعات پرداخت",
+    "topup.amount": "مبلغ (دلار)",
+    "topup.network": "شبکهٔ پرداخت",
+    "topup.cryptoNotice": "پرداخت با رمزارز انجام می‌شود. پس از ثبت درخواست، مدیر آدرس کیف پول شبکهٔ انتخابی را برایتان ایمیل می‌کند. پرداخت را انجام دهید، سپس به اینجا برگردید و «پرداخت کردم» را بزنید. پس از تأیید تراکنش، موجودی شما افزایش می‌یابد.",
+    "topup.submit": "ثبت درخواست",
+    "topup.sending": "در حال ارسال…",
+    "topup.errEmail": "یک آدرس ایمیل وارد کنید.",
+    "topup.wallet": "پرداخت به",
+    "topup.txHash": "هش تراکنش",
+    "topup.txHashHint": "اختیاری — به پیدا کردن پرداخت شما کمک می‌کند",
+    "topup.markPaid": "پرداخت کردم",
+    "topup.cancelRequest": "لغو درخواست",
+    "topup.history": "درخواست‌های قبلی",
+    "topup.step.pending": "ثبت شد",
+    "topup.step.awaiting_payment": "اطلاعات پرداخت ارسال شد",
+    "topup.step.paid": "پرداخت شد",
+    "topup.step.completed": "به موجودی افزوده شد",
+    "topup.explain.pending": "درخواست شما ثبت شد. مدیر به‌زودی آدرس کیف پول شبکهٔ شما را ایمیل می‌کند.",
+    "topup.explain.awaiting_payment": "اطلاعات پرداخت را برایتان ایمیل کردیم (پایین هم آمده است). مبلغ دقیق را فقط روی شبکهٔ انتخابی بفرستید، سپس «پرداخت کردم» را بزنید.",
+    "topup.explain.paid": "سپاس! در حال بررسی تراکنش هستیم. به‌محض تأیید، موجودی شما افزایش می‌یابد.",
+    "topup.status.pending": "ثبت شد",
+    "topup.status.awaiting_payment": "در انتظار پرداخت",
+    "topup.status.paid": "پرداخت شد",
+    "topup.status.completed": "افزوده شد",
+    "topup.status.rejected": "رد شد",
+    "topup.status.cancelled": "لغو شد",
   },
 };
 

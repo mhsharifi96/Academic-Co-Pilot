@@ -302,9 +302,13 @@ JWT bearer auth with bcrypt password hashing (`app/core/security.py`).
 7-day lifetime; the SPA stores the token in localStorage and drops to the login
 screen on any `401` via an `auth:logout` event. `GET /auth/config` is public and
 tells the login screen whether sign-up is currently open (see 10.4).
+When `TURNSTILE_SECRET` is set, login and sign-up also require a Cloudflare
+Turnstile CAPTCHA: `/auth/config` returns `turnstile_site_key`, the login card
+renders the widget, and the backend verifies the token (matching action and
+`TURNSTILE_HOSTNAMES`) before checking credentials — 403 otherwise.
 
 ### 10.2 Per-user balance and usage metering
-Each account carries a USD `balance` (default `$0.50`, `DEFAULT_USER_BALANCE`).
+Each account carries a USD `balance` (default `$0.07`, `DEFAULT_USER_BALANCE`).
 Every chat/resume turn measures its token usage, converts it to a dollar cost
 (`COST_INPUT_PER_1M` / `COST_OUTPUT_PER_1M`), deducts it from the user, and
 writes an audit row to `usage_records`. The remaining balance is returned on
@@ -312,6 +316,18 @@ every `ChatResponse` — and on every wizard turn/resume/suggestions response �
 and shown live in both the chat top bar and the wizard runner header. A user at or below
 `MIN_BALANCE_TO_CHAT` is blocked with **HTTP 402** until topped up. Admins are
 never blocked. Disable metering entirely with `ENABLE_BILLING=false`.
+
+**Top-up requests (crypto, manual).** Clicking the balance chip (chat top bar or
+wizard runner) opens `TopUpModal.jsx`: contact email, amount ($5/$10/$20/$30)
+and crypto network (USDT TRC-20/ERC-20/BEP-20/TON, BTC, ETH, TRX, TON). Flow:
+user requests (`pending`) → admin emails the wallet address from the **Top-ups**
+admin tab (`awaiting_payment`; sent via SMTP when `SMTP_HOST` is set, otherwise
+a `mailto:` link is offered) → user pays and presses *I've paid*, optionally
+with the tx hash (`paid`) → admin confirms, which credits the balance
+(`completed`). Admin can also reject; user can cancel before paying. One open
+request per user. Rules in `app/services/topup_service.py` (tested in
+`tests/test_topup.py`); routes in `app/api/v1/endpoints/billing.py`
+(`/billing/topup-*`, `/admin/topup-requests*`).
 
 ### 10.3 Admin console
 The first account to register becomes admin (or set `ADMIN_EMAIL` to promote a
@@ -357,7 +373,10 @@ UI: the **Site** tab of `AdminPage.jsx` (`SiteSettingsPanel.jsx`).
   status, and recover from failures (upload manually or continue without).
 - **Wizard landing page** — a **public**, bilingual (en/fa, RTL-aware) catalogue of
   guided workflows at `#/`, reachable without signing in; picking one leads to a
-  detail page with the step outline, then to the runner.
+  detail page with the step outline, then to the runner. Also carries a
+  "why us" benefits grid, a four-step "how to top up your wallet" guide (crypto,
+  pay-as-you-go), a closing sign-up CTA, and SEO metadata (meta description,
+  Open Graph/Twitter, JSON-LD, localised `<title>`).
 - **Suggested questions** — on request, three follow-up questions tailored to the
   current step, each expandable for the full text and a reason, each sendable
   with one click.

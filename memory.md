@@ -32,7 +32,7 @@ over re-scanning the codebase. For depth see `Design.md`, `PRD.md`,
    New tools register once in `app/agents/tools.py:default_tools` (both agents).
 7. **Screening CSVs need `title` + `abstract` columns.**
 7b. **Per-user balance + guardrails** (added on `prod`):
-   - `User.balance` (USD, default `DEFAULT_USER_BALANCE=0.5`) + `User.is_admin`.
+   - `User.balance` (USD, default `DEFAULT_USER_BALANCE=0.07`) + `User.is_admin`.
      `BaseAgent.run`/`resume` now return `(result, usage)`; the chat endpoint bills
      via `app/services/billing_service.py` and writes `usage_records`. Balance ≤
      `MIN_BALANCE_TO_CHAT` → HTTP 402. Toggle `ENABLE_BILLING`. New `users` columns
@@ -45,6 +45,17 @@ over re-scanning the codebase. For depth see `Design.md`, `PRD.md`,
      Closed → register returns 403, **except the very first account** (rule:
      `registration_allowed` in `app/services/site_settings_service.py`). UI: the
      **Site** tab of AdminPage (`SiteSettingsPanel.jsx`).
+   - **Top-ups** (`topup_requests`, `app/models/billing.py`): manual crypto flow
+     `pending → awaiting_payment → paid → completed` (+ `rejected`/`cancelled`).
+     Only `admin_confirm` credits the balance (row-locked). Transition rule
+     `can_transition` in `app/services/topup_service.py`. Email via optional
+     `SMTP_*`; unset → admin gets a `mailto:` link. UI: balance chip →
+     `TopUpModal.jsx`; admin **Top-ups** tab (`TopUpAdminPanel.jsx`).
+   - **CAPTCHA:** Cloudflare Turnstile on `/auth/login` + `/auth/register`,
+     enforced only when `TURNSTILE_SECRET` is set (off in tests). Token field
+     `turnstile_token`; action must match (`login`/`signup`) and `hostname` must
+     be in `TURNSTILE_HOSTNAMES` (empty → everything refused). Site key is public
+     and reaches the UI via `GET /auth/config`.
    - Guardrail in `app/agents/guardrails.py` (`screen_message`): keyword rules +
      cheap LLM classifier, runs in the chat endpoint BEFORE the agent, **fails
      open**, blocks off-topic/jailbreak with `status="blocked"` (not billed).
