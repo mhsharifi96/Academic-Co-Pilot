@@ -10,6 +10,7 @@ from app.core.sessions import session_manager
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.auth import User
+from app.models.wizard import WIZARD_AGENT_TYPE
 from app.services.session_service import (
     delete_session_row,
     get_owned_session,
@@ -293,8 +294,19 @@ async def delete_session(
     uploaded files on disk (``data/<session_id>/``), the in-memory metadata, and
     the ownership row.
     """
-    if await get_owned_session(db, current_user, session_id) is None:
+    owned = await get_owned_session(db, current_user, session_id)
+    if owned is None:
         raise HTTPException(status_code=404, detail="Session not found.")
+    if owned.agent_type == WIZARD_AGENT_TYPE:
+        # Deleting the thread out from under a run would orphan it. Wizard runs
+        # are removed via DELETE /wizard-runs/{run_id}, which cleans up both.
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "This conversation belongs to a wizard run; delete it via "
+                "/api/v1/wizard-runs/{run_id} instead."
+            ),
+        )
 
     # 1. Drop conversation checkpoints from the saver.
     saver = getattr(request.app.state, "checkpointer", None)

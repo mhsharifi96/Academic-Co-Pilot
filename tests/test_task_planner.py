@@ -118,6 +118,31 @@ def test_update_plan_tool_advances_step():
     assert run(session_manager.get_plan(sid))[0]["status"] == "done"
 
 
+def test_update_plan_tool_batches_several_steps():
+    sid = "tool-batch"
+    task_planner.write_plan.func(steps=["a", "b", "c"], config=_cfg(sid))
+    out = task_planner.update_plan.func(
+        step_indices=[0, 1], status="done", config=_cfg(sid)
+    )
+    assert "[x] 0. a" in out and "[x] 1. b" in out and "[ ] 2. c" in out
+
+
+def test_update_plan_tool_batch_out_of_range_changes_nothing():
+    sid = "tool-batch-oor"
+    task_planner.write_plan.func(steps=["a", "b"], config=_cfg(sid))
+    out = task_planner.update_plan.func(
+        step_indices=[0, 7], status="done", config=_cfg(sid)
+    )
+    assert "out of range" in out
+    assert run(session_manager.get_plan(sid))[0]["status"] == "pending"
+
+
+def test_update_plan_tool_requires_an_index():
+    sid = "tool-noindex"
+    task_planner.write_plan.func(steps=["a"], config=_cfg(sid))
+    assert "step_index" in task_planner.update_plan.func(status="done", config=_cfg(sid))
+
+
 def test_update_plan_tool_out_of_range_message():
     sid = "tool-oor"
     task_planner.write_plan.func(steps=["only"], config=_cfg(sid))

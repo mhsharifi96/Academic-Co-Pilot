@@ -41,6 +41,32 @@ def _slugify(text: str, default: str = "image") -> str:
     return (slug[:60] or default)
 
 
+def agent_chat_kwargs() -> dict[str, Any]:
+    """
+    Extra ``ChatOpenAI`` kwargs for models that will have **function tools**
+    bound to them (the agents, and anything using ``bind_tools`` /
+    ``with_structured_output``).
+
+    Reasoning models reject function tools on ``/v1/chat/completions`` unless
+    ``reasoning_effort`` is explicitly ``"none"``::
+
+        Function tools with reasoning_effort are not supported for <model> in
+        /v1/chat/completions. To use function tools, use /v1/responses or set
+        reasoning_effort to 'none'.
+
+    Both escapes are configurable: ``AGENT_REASONING_EFFORT`` (default
+    ``"none"``) and ``AGENT_USE_RESPONSES_API`` (send the call to
+    ``/v1/responses``, which allows tools *with* reasoning).
+    """
+    kwargs: dict[str, Any] = {}
+    effort = (settings.AGENT_REASONING_EFFORT or "").strip()
+    if effort:
+        kwargs["reasoning_effort"] = effort
+    if settings.AGENT_USE_RESPONSES_API:
+        kwargs["use_responses_api"] = True
+    return kwargs
+
+
 class LLMRepository:
     """Provider-agnostic access to chat and image models."""
 

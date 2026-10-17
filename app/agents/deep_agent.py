@@ -26,6 +26,7 @@ import os
 from typing import List, Optional
 from langchain_core.tools import BaseTool
 from langchain_openai import ChatOpenAI
+from app.repositories.llm import agent_chat_kwargs
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
 from app.agents.base import BaseAgent
@@ -63,6 +64,8 @@ class DeepResearchAgent(BaseAgent):
             model=settings.OPENAI_MODEL,
             api_key=settings.OPENAI_API_KEY,
             temperature=0,
+            # deepagents binds its own tools to this model as well.
+            **agent_chat_kwargs(),
         )
 
         # create_deep_agent returns a compiled LangGraph graph (ainvoke /

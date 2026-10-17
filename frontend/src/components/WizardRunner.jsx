@@ -1,0 +1,502 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import * as api from "../api.js";
+import * as auth from "../auth.js";
+import { useT } from "../i18n.js";
+import { navigate } from "../router.js";
+import InterruptCard from "./InterruptCard.jsx";
+import LangToggle from "./LangToggle.jsx";
+import Message from "./Message.jsx";
+import SuggestedQuestions from "./SuggestedQuestions.jsx";
+import TopUpModal from "./TopUpModal.jsx";
+import Icon from "./Icon.jsx";
+import WizardStepper from "./WizardStepper.jsx";
+
+// The guided chat for one run.
+//
+// Unlike plain chat, the transcript is authoritative in the database, so it is
+// loaded from GET /wizard-runs/{id} rather than reconstructed from the graph.
+// The step advances server-side once a step's message cap is used up; every
+// turn response carries the updated step state, which is what drives the
+// stepper above the conversation.
+export default function WizardRunner({ runId }) {
+  const { t, lang } = useT();
+
+  const [run, setRun] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [draft, setDraft] = useState("");
+  const [interrupt, setInterrupt] = useState(null);
+  const [notice, setNotice] = useState("");
+  // The agent said this step's goal is met. Advisory only — the run stays put
+  // until the user chooses to move on.
+  const [suggested, setSuggested] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+  // Suggested follow-up questions. Only ever populated by an explicit user
+  // action — generating them is a billed LLM call.
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggesting, setSuggesting] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [booting, setBooting] = useState(true);
+  const [error, setError] = useState("");
+  // Remaining credit (USD). Seeded from the stored user so the chip paints on
+  // the first frame, then refreshed from the server. `null` means billing is
+  // off (the API returns no balance) — the chip stays hidden.
+  const [balance, setBalance] = useState(() => {
+    const b = auth.getUser()?.balance;
+    return typeof b === "number" ? b : null;
+  });
+  const [topUpOpen, setTopUpOpen] = useState(false);
+
+  // Files uploaded into this run. They live on the run's backing ChatSession,
+  // so the agent picks them up through the per-turn context without the
+  // transcript having to mention them.
+  const [files, setFiles] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [dragging, setDragging] = useState(false);
+
+  const endRef = useRef(null);
+  const taRef = useRef(null);
+  const fileRef = useRef(null);
+  // Drag events fire per child element; count enter/leave to know when the
+  // pointer has really left the drop zone.
+  const dragDepth = useRef(0);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading, interrupt]);
+
+  // Auto-grow the composer, matching MessageInput's behaviour.
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${ta.scrollHeight}px`;
+  }, [draft]);
+
+  const load = useCallback(async () => {
+    setBooting(true);
+    setError("");
+    try {
+      const data = await api.getWizardRun(runId, lang);
+      setRun(data);
+      setMessages(
+        (data.messages || []).map((m) => ({ role: m.role, content: m.content }))
+      );
+      // Files outlive the browser session (they're on disk under the run's
+      // session), so a resumed run has to load them, not just track uploads.
+      try {
+        const listed = await api.listFiles(data.session_id);
+        setFiles(listed.files || []);
+      } catch {
+        /* non-fatal: the run still works without the file strip */
+      }
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBooting(false);
+    }
+  }, [runId, lang]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // The stored balance can be stale (other tabs, admin top-ups), so confirm it
+  // once when the run opens. Non-fatal if it fails — the seed value stands.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const me = await api.fetchMe();
+        if (cancelled || !me) return;
+        auth.setUser(me);
+        if (typeof me.balance === "number") setBalance(me.balance);
+      } catch {
+        /* keep the seeded value */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Every billed response carries the balance left after it was charged; mirror
+  // it into the stored user so the chat screen's chip agrees.
+  function applyBalance(value) {
+    if (typeof value !== "number") return;
+    setBalance(value);
+    auth.patchUser({ balance: value });
+  }
+
+  // Fold a turn response back into local state: transcript, step position, and
+  // the "you've moved on" notice.
+  function applyTurn(res, sentText) {
+    applyBalance(res.balance);
+    if (sentText != null) {
+      setMessages((prev) => [...prev, { role: "user", content: sentText }]);
+    }
+    if (res.response) {
+      setMessages((prev) => [...prev, { role: "assistant", content: res.response }]);
+    }
+    setInterrupt(res.status === "interrupted" ? res.interrupt : null);
+    setRun((prev) =>
+      prev
+        ? {
+            ...prev,
+            status: res.run_status,
+            current_step: res.current_step,
+            current_step_index: res.current_step_index,
+            total_steps: res.total_steps || prev.total_steps,
+            messages_left_in_step: res.messages_left_in_step,
+          }
+        : prev
+    );
+    // A step that just advanced can't also be pending completion.
+    setSuggested(!!res.step_complete_suggested);
+    // Suggestions were written against the previous reply; they are stale now.
+    setSuggestions([]);
+    if (res.completed) {
+      setNotice("");
+    } else if (res.step_advanced && res.current_step?.name) {
+      setNotice(t("runner.advanced", { name: res.current_step.name }));
+    } else {
+      setNotice("");
+    }
+  }
+
+  async function finishStep() {
+    if (finishing) return;
+    setFinishing(true);
+    setError("");
+    try {
+      const res = await api.advanceWizardRun(runId, lang);
+      applyTurn(res, null); // response is empty — no agent call was made
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setFinishing(false);
+    }
+  }
+
+  // Upload into the run's backing session. PDFs are ingested into the vector
+  // store server-side, CSVs are just stored — both then show up in the agent's
+  // per-turn context, so nothing needs to be said in the chat.
+  async function uploadFiles(fileList) {
+    const chosen = Array.from(fileList || []);
+    if (!chosen.length || uploading || !run?.session_id) return;
+    setUploading(true);
+    setError("");
+    try {
+      const res = await api.uploadFiles(chosen, run.session_id);
+      const listed = await api.listFiles(run.session_id);
+      setFiles(listed.files || []);
+      // Per-file results: a PDF whose text couldn't be extracted still uploads.
+      const failed = (res.files || []).filter((f) => f.status === "error");
+      if (failed.length) {
+        setError(failed.map((f) => `${f.filename}: ${f.message}`).join(" · "));
+      }
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = ""; // re-picking the same file must fire
+    }
+  }
+
+  function onDragEnter(e) {
+    if (!Array.from(e.dataTransfer?.types || []).includes("Files")) return;
+    e.preventDefault();
+    dragDepth.current += 1;
+    setDragging(true);
+  }
+
+  function onDragLeave() {
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setDragging(false);
+  }
+
+  function onDrop(e) {
+    e.preventDefault();
+    dragDepth.current = 0;
+    setDragging(false);
+    if (!attachDisabled) uploadFiles(e.dataTransfer?.files);
+  }
+
+  async function requestSuggestions() {
+    if (suggesting) return;
+    setSuggesting(true);
+    setError("");
+    try {
+      const res = await api.suggestWizardQuestions(runId, lang);
+      applyBalance(res.balance);
+      setSuggestions(res.suggestions || []);
+      if (!(res.suggestions || []).length) setError(t("suggest.empty"));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  async function sendText(text) {
+    if (!text || loading) return;
+    setDraft("");
+    setLoading(true);
+    setError("");
+    try {
+      const res = await api.sendWizardMessage(runId, text, lang);
+      applyTurn(res, text);
+    } catch (e) {
+      setError(e.message);
+      setDraft(text); // give the message back rather than losing it
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const send = () => sendText(draft.trim());
+
+  async function resume(decision, opts) {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await api.resumeWizardRun(runId, decision, opts, lang);
+      applyTurn(res, null);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function discard() {
+    if (!window.confirm(t("runner.discardConfirm"))) return;
+    try {
+      await api.abandonWizardRun(runId);
+      navigate("/runs");
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  const done = run?.status === "completed";
+  const abandoned = run?.status === "abandoned";
+  const composerDisabled = loading || !!interrupt || done || abandoned;
+  // Attaching stays available while the agent is mid-reply — the file is only
+  // read on the *next* turn, so there is nothing to race.
+  const attachDisabled = uploading || done || abandoned || !run?.session_id;
+
+  return (
+    <div
+      className="wz-runner"
+      onDragEnter={onDragEnter}
+      onDragOver={(e) => {
+        // Without preventDefault on dragover the browser never fires drop.
+        if (Array.from(e.dataTransfer?.types || []).includes("Files")) {
+          e.preventDefault();
+        }
+      }}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
+      {dragging && !attachDisabled && (
+        <div className="wz-dropzone" role="status">
+          <Icon name="paperclip" size={26} />
+          <strong>{t("runner.dropHere")}</strong>
+          <span>{t("runner.attachHint")}</span>
+        </div>
+      )}
+
+      <header className="wz-topbar">
+        <button className="wz-back" onClick={() => navigate("/runs")}>
+          <Icon name="arrow" size={16} className="wz-back-arrow" />
+          <span>{t("nav.myRuns")}</span>
+        </button>
+        <span className="wz-runner-title">{run?.wizard_title || ""}</span>
+        <div className="wz-topbar-actions">
+          {balance !== null && (
+            <button
+              type="button"
+              className={`user-balance wz-balance balance-btn${balance <= 0 ? " empty" : ""}`}
+              title={`${t("runner.balanceHint")} ${t("topup.chipHint")}`}
+              onClick={() => setTopUpOpen(true)}
+            >
+              <span className="wz-balance-label">{t("runner.balance")}</span>
+              <span className="wz-balance-value">${balance.toFixed(3)}</span>
+              <span className="balance-plus" aria-hidden="true">+</span>
+            </button>
+          )}
+          <LangToggle compact />
+          {!done && !abandoned && (
+            <button className="wz-btn ghost small" onClick={discard}>
+              {t("runner.discard")}
+            </button>
+          )}
+        </div>
+      </header>
+
+      {run && (
+        <WizardStepper
+          run={run}
+          onFinishStep={done || abandoned ? null : finishStep}
+          finishing={finishing}
+          suggested={suggested}
+        />
+      )}
+
+      <div className="wz-thread">
+        <div className="wz-thread-inner">
+        {error && <div className="banner-error">⚠️ {error}</div>}
+
+        {booting ? (
+          <p className="wz-muted">{t("runner.loading")}</p>
+        ) : (
+          <>
+            {messages.length === 0 && !interrupt && (
+              <div className="wz-thread-welcome">
+                <Icon name="play" size={22} />
+                <p>{t("runner.welcome")}</p>
+                {run?.current_step?.name && <strong>{run.current_step.name}</strong>}
+              </div>
+            )}
+
+            {messages.map((m, i) => (
+              <Message key={i} role={m.role} content={m.content} />
+            ))}
+
+            {notice && (
+              <div className="wz-notice" role="status">
+                <Icon name="check" size={16} />
+                <span>{notice}</span>
+              </div>
+            )}
+
+            {/* The agent thinks this step is done. Offered inline as well as in
+                the header, because that's where the user is reading. */}
+            {suggested && !done && !abandoned && (
+              <div className="wz-suggest" role="status">
+                <Icon name="check" size={18} />
+                <div className="wz-suggest-body">
+                  <strong>{t("runner.suggestTitle")}</strong>
+                  <span>{t("runner.suggestBody")}</span>
+                </div>
+                <div className="wz-suggest-actions">
+                  <button
+                    className="wz-btn ghost small"
+                    onClick={() => setSuggested(false)}
+                  >
+                    {t("runner.suggestStay")}
+                  </button>
+                  <button
+                    className="wz-btn primary small"
+                    onClick={finishStep}
+                    disabled={finishing}
+                  >
+                    {finishing ? t("common.saving") : t("runner.suggestGo")}
+                    <Icon name="arrow" size={15} className="wz-go-arrow" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {interrupt && (
+              <InterruptCard
+                key={JSON.stringify(interrupt.pending_actions)}
+                interrupt={interrupt}
+                loading={loading}
+                onResume={resume}
+              />
+            )}
+
+            {uploading && <div className="typing">{t("runner.uploading")}</div>}
+
+            {loading && <div className="typing">{t("runner.thinking")}</div>}
+
+            {done && (
+              <div className="wz-complete">
+                <Icon name="check" size={28} />
+                <h2>{t("runner.completedTitle")}</h2>
+                <p>{t("runner.completedBody")}</p>
+                <div className="wz-hero-actions">
+                  <button className="wz-btn ghost" onClick={() => navigate("/")}>
+                    {t("runs.browse")}
+                  </button>
+                  <button className="wz-btn ghost" onClick={() => navigate("/app")}>
+                    {t("nav.backToApp")}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {abandoned && <div className="wz-notice">{t("runner.abandoned")}</div>}
+          </>
+        )}
+
+          <div ref={endRef} />
+        </div>
+      </div>
+
+      {!done && !abandoned && (
+        <div className="composer wz-composer">
+          {files.length > 0 && (
+            <ul className="wz-files" aria-label={t("runner.filesLabel")}>
+              {files.map((f) => (
+                <li key={f.path} className="wz-file" title={f.path}>
+                  <Icon name={f.type === "csv" ? "chart" : "document"} size={14} />
+                  <span className="wz-file-name">{f.filename}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <SuggestedQuestions
+            suggestions={suggestions}
+            loading={suggesting}
+            disabled={composerDisabled}
+            onRequest={requestSuggestions}
+            onSend={sendText}
+            onDismiss={() => setSuggestions([])}
+          />
+          <div className="composer-inner">
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              accept=".pdf,.csv"
+              className="wz-file-input"
+              onChange={(e) => uploadFiles(e.target.files)}
+            />
+            <button
+              type="button"
+              className="wz-attach"
+              onClick={() => fileRef.current?.click()}
+              disabled={attachDisabled}
+              aria-label={t("runner.attach")}
+              title={t("runner.attachHint")}
+            >
+              <Icon name="paperclip" size={18} />
+            </button>
+            <textarea
+              ref={taRef}
+              rows={1}
+              value={draft}
+              placeholder={t("runner.placeholder")}
+              disabled={composerDisabled}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+            />
+            <button className="primary" disabled={composerDisabled || !draft.trim()} onClick={send}>
+              {t("runner.send")}
+            </button>
+          </div>
+        </div>
+      )}
+      {topUpOpen && (
+        <TopUpModal onClose={() => setTopUpOpen(false)} onBalance={applyBalance} />
+      )}
+    </div>
+  );
+}

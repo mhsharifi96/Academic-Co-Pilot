@@ -35,7 +35,7 @@ class User(Base):
     balance: Mapped[float] = mapped_column(
         Float,
         default=lambda: settings.DEFAULT_USER_BALANCE,
-        server_default=text("0.5"),
+        server_default=text("0.07"),
         nullable=False,
     )
     # Admins can view all users and adjust balances via /api/v1/admin/*.

@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import * as api from "../api.js";
+import { useT } from "../i18n.js";
+import SiteSettingsPanel from "./SiteSettingsPanel.jsx";
+import TopUpAdminPanel from "./TopUpAdminPanel.jsx";
+import WizardAdminPanel from "./WizardAdminPanel.jsx";
 
-// Simple admin console for managing user balances. Only rendered when the
-// logged-in user has is_admin === true (gated in App.jsx / SessionBar).
+// Admin console, split into tabs: user balances, top-up requests, guided
+// workflows, and site-wide switches. Only rendered when the logged-in user has
+// is_admin === true (gated in App.jsx / SessionBar).
 export default function AdminPage({ onBack, currentUserId }) {
+  const { t } = useT();
+  const [tab, setTab] = useState("users"); // "users" | "topups" | "wizards" | "site"
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -26,9 +33,10 @@ export default function AdminPage({ onBack, currentUserId }) {
     }
   }, []);
 
+  // Only fetch the user list when its tab is actually showing.
   useEffect(() => {
-    load();
-  }, [load]);
+    if (tab === "users") load();
+  }, [tab, load]);
 
   const applyUpdated = useCallback((updated) => {
     setUsers((list) => list.map((u) => (u.id === updated.id ? updated : u)));
@@ -95,7 +103,51 @@ export default function AdminPage({ onBack, currentUserId }) {
         <button className="ghost back-btn" onClick={onBack}>
           ← Back to chat
         </button>
-        <h1>User administration</h1>
+        <h1>Administration</h1>
+
+        <div className="admin-tabs" role="tablist">
+          <button
+            role="tab"
+            aria-selected={tab === "users"}
+            className={`admin-tab${tab === "users" ? " active" : ""}`}
+            onClick={() => setTab("users")}
+          >
+            Users
+          </button>
+          <button
+            role="tab"
+            aria-selected={tab === "topups"}
+            className={`admin-tab${tab === "topups" ? " active" : ""}`}
+            onClick={() => setTab("topups")}
+          >
+            Top-ups
+          </button>
+          <button
+            role="tab"
+            aria-selected={tab === "wizards"}
+            className={`admin-tab${tab === "wizards" ? " active" : ""}`}
+            onClick={() => setTab("wizards")}
+          >
+            {t("admin.title")}
+          </button>
+          <button
+            role="tab"
+            aria-selected={tab === "site"}
+            className={`admin-tab${tab === "site" ? " active" : ""}`}
+            onClick={() => setTab("site")}
+          >
+            Site
+          </button>
+        </div>
+
+        {tab === "topups" ? (
+          <TopUpAdminPanel />
+        ) : tab === "wizards" ? (
+          <WizardAdminPanel />
+        ) : tab === "site" ? (
+          <SiteSettingsPanel />
+        ) : (
+          <>
         <p className="admin-sub">
           Manage each user's remaining balance (USD). Balances are consumed as
           users chat with the agents.
@@ -175,6 +227,8 @@ export default function AdminPage({ onBack, currentUserId }) {
               ))}
             </tbody>
           </table>
+        )}
+          </>
         )}
       </div>
     </div>

@@ -300,16 +300,34 @@ section; the deep agent runs the same protocol autonomously.
 JWT bearer auth with bcrypt password hashing (`app/core/security.py`).
 `POST /auth/register`, `POST /auth/login`, `GET /auth/me`. Tokens default to a
 7-day lifetime; the SPA stores the token in localStorage and drops to the login
-screen on any `401` via an `auth:logout` event.
+screen on any `401` via an `auth:logout` event. `GET /auth/config` is public and
+tells the login screen whether sign-up is currently open (see 10.4).
+When `TURNSTILE_SECRET` is set, login and sign-up also require a Cloudflare
+Turnstile CAPTCHA: `/auth/config` returns `turnstile_site_key`, the login card
+renders the widget, and the backend verifies the token (matching action and
+`TURNSTILE_HOSTNAMES`) before checking credentials — 403 otherwise.
 
 ### 10.2 Per-user balance and usage metering
-Each account carries a USD `balance` (default `$0.50`, `DEFAULT_USER_BALANCE`).
+Each account carries a USD `balance` (default `$0.07`, `DEFAULT_USER_BALANCE`).
 Every chat/resume turn measures its token usage, converts it to a dollar cost
 (`COST_INPUT_PER_1M` / `COST_OUTPUT_PER_1M`), deducts it from the user, and
 writes an audit row to `usage_records`. The remaining balance is returned on
-every `ChatResponse` and shown live in the top bar. A user at or below
+every `ChatResponse` — and on every wizard turn/resume/suggestions response —
+and shown live in both the chat top bar and the wizard runner header. A user at or below
 `MIN_BALANCE_TO_CHAT` is blocked with **HTTP 402** until topped up. Admins are
 never blocked. Disable metering entirely with `ENABLE_BILLING=false`.
+
+**Top-up requests (crypto, manual).** Clicking the balance chip (chat top bar or
+wizard runner) opens `TopUpModal.jsx`: contact email, amount ($5/$10/$20/$30)
+and crypto network (USDT TRC-20/ERC-20/BEP-20/TON, BTC, ETH, TRX, TON). Flow:
+user requests (`pending`) → admin emails the wallet address from the **Top-ups**
+admin tab (`awaiting_payment`; sent via SMTP when `SMTP_HOST` is set, otherwise
+a `mailto:` link is offered) → user pays and presses *I've paid*, optionally
+with the tx hash (`paid`) → admin confirms, which credits the balance
+(`completed`). Admin can also reject; user can cancel before paying. One open
+request per user. Rules in `app/services/topup_service.py` (tested in
+`tests/test_topup.py`); routes in `app/api/v1/endpoints/billing.py`
+(`/billing/topup-*`, `/admin/topup-requests*`).
 
 ### 10.3 Admin console
 The first account to register becomes admin (or set `ADMIN_EMAIL` to promote a
@@ -318,8 +336,26 @@ specific account deterministically at startup). Admin-only endpoints
 - `GET /admin/users` — list users with balance, admin flag, created date.
 - `PATCH /admin/users/{id}` — set a balance outright and/or toggle admin.
 - `POST /admin/users/{id}/adjust-balance` — add or subtract credit.
+- `GET` / `PATCH /admin/settings` — read or flip the site-wide switches (10.4).
 
 UI: `AdminPage.jsx`.
+
+### 10.4 Site settings — open/close user registration
+A singleton `site_settings` row (`app/models/site.py`) holds switches an admin
+can flip at runtime, without a redeploy — unlike `app/core/config.py`, which is
+environment-only. The first switch is `registration_open` (default **true**):
+
+- **Closed** → `POST /auth/register` returns **403**, and the SPA's login screen
+  hides the "Create one" link and explains that sign-up is closed. Logging in,
+  and everything an existing user can do, are unaffected.
+- The **very first account is always allowed through**, even when closed, so a
+  fresh deployment can still bootstrap its admin (the rule is the pure
+  `registration_allowed` in `app/services/site_settings_service.py`, unit-tested
+  in `tests/test_site_settings.py`).
+- The row is inserted lazily on first read, so no seed or migration step is
+  needed; `migrations/20260812_add_site_settings.sql` is a parity file.
+
+UI: the **Site** tab of `AdminPage.jsx` (`SiteSettingsPanel.jsx`).
 
 ---
 
@@ -335,6 +371,43 @@ UI: `AdminPage.jsx`.
 - **Interrupt card** — Approve / Edit (editable JSON args) / Reject with reason.
 - **Downloads tab + DOI chips + status cards** — queue a PDF by DOI, watch job
   status, and recover from failures (upload manually or continue without).
+- **Wizard landing page** — a **public**, bilingual (en/fa, RTL-aware) catalogue of
+  guided workflows at `#/`, reachable without signing in; picking one leads to a
+  detail page with the step outline, then to the runner. Also carries a
+  "why us" benefits grid, a four-step "how to top up your wallet" guide (crypto,
+  pay-as-you-go), a closing sign-up CTA, and SEO metadata (meta description,
+  Open Graph/Twitter, JSON-LD, localised `<title>`).
+- **Suggested questions** — on request, three follow-up questions tailored to the
+  current step, each expandable for the full text and a reason, each sendable
+  with one click.
+- **Wizard runner** — the guided chat: a **sticky** stepper showing "Step 2 of 5",
+  a progress bar, the current step's name, and how many messages remain before
+  the workflow moves on; a **Finish step** control to move on early; an inline
+  card when the agent reports the step's goal met (offered, never automatic);
+  a **wallet chip** in the header with the remaining USD balance, updated from
+  every billed reply and red once exhausted; **file upload** (paperclip in the
+  composer or drag-and-drop over the runner, PDFs ingested on arrival, files
+  listed above the composer and restored when the run is resumed); and a
+  completion panel when the last step is done.
+- **My workflows** — in-progress and finished runs, with Continue.
+- **Language toggle (EN / فا)** — switches UI strings, the language the wizard API
+  resolves content for, and `<html dir>`.
+- **Wizard admin** — create/publish/delete workflows and edit their steps
+  (bilingual fields side by side, guideline prompt, message cap, reordering),
+  plus **Add many…** — paste an outline, one step name per line, and get the
+  whole sequence created in order in a single request.
+- **Create a workflow with AI** — the admin describes what the workflow should
+  do (English or Persian), and the AI drafts the bilingual title/description,
+  icon and every step with its guideline prompt, grounded in the agent's real
+  tools. The admin reviews and edits the draft, then creates it unpublished.
+  Unknown tool names are flagged before saving
+  (`POST /admin/wizards/draft`, `WizardGenerator.jsx`).
+- **Seven shipped workflows** (`scripts/seed_wizards.py`, idempotent): *Run a
+  systematic literature review* (6 steps), *Analyse your dataset*, *Understand a
+  paper deeply*, *Write a research proposal*, *Get ready to submit* (5 steps
+  each), *Find a title for your thesis or paper* and *Back your text with
+  recent, reliable references* (4 steps each) — bilingual throughout, each step carrying a written guideline prompt
+  that drives the agent through the real tools.
 - **Guidelines page** — in-app usage guidance.
 - **Admin page** — user/balance management for admins.
 - **Balance indicator** in the top bar.
@@ -367,6 +440,25 @@ UI: `AdminPage.jsx`.
 | `GET /api/v1/admin/users` | *(admin)* List users |
 | `PATCH /api/v1/admin/users/{id}` | *(admin)* Set balance / admin flag |
 | `POST /api/v1/admin/users/{id}/adjust-balance` | *(admin)* Add or subtract credit |
+| `GET /api/v1/auth/config` | **Public** — is registration open? |
+| `GET /api/v1/admin/settings` | *(admin)* Read site-wide settings |
+| `PATCH /api/v1/admin/settings` | *(admin)* Open or close user registration |
+| `GET /api/v1/wizards?lang=` | **Public** — published wizards, resolved for `en`/`fa` |
+| `GET /api/v1/wizards/{slug}?lang=` | **Public** — one wizard + its step outline |
+| `POST /api/v1/wizard-runs` | Start a wizard, or resume your active run (returns the transcript) |
+| `GET /api/v1/wizard-runs?status=` | Your runs, most recently active first |
+| `GET /api/v1/wizard-runs/{id}` | One run + its persisted transcript |
+| `POST /api/v1/wizard-runs/{id}/messages` | Take a turn (advances the step when the cap is used up) |
+| `POST /api/v1/wizard-runs/{id}/suggestions` | Three follow-up questions the user could send next (billed) |
+| `POST /api/v1/wizard-runs/{id}/advance` | Finish the current step now, ignoring its message cap |
+| `POST /api/v1/wizard-runs/{id}/resume` | Approve / edit / reject a paused tool call in a run |
+| `DELETE /api/v1/wizard-runs/{id}` | Abandon a run (transcript kept, thread + files cleared) |
+| `GET|POST /api/v1/admin/wizards` | *(admin)* List all wizards / create one |
+| `GET|PATCH|DELETE /api/v1/admin/wizards/{id}` | *(admin)* Read / edit / delete (409 once runs exist) |
+| `POST /api/v1/admin/wizards/{id}/steps` | *(admin)* Append a step |
+| `POST /api/v1/admin/wizards/{id}/steps/bulk` | *(admin)* Append a whole outline (one step per line) |
+| `PATCH|DELETE /api/v1/admin/wizard-steps/{id}` | *(admin)* Edit / delete a step |
+| `PUT /api/v1/admin/wizards/{id}/steps/reorder` | *(admin)* Rewrite step order |
 
 Interactive docs at `http://localhost:8000/docs`.
 

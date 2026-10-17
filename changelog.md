@@ -7,6 +7,281 @@ All notable changes to this project. Format loosely follows
 Work in progress on the current branch (`main`) — not yet committed. Adds the
 authentication and persistence layer on top of the original agent MVP:
 ### Added
+- **Landing page: "Why Academic Co-Pilot" and "Pay only for what you use"
+  sections, plus SEO.** `WizardLanding.jsx` gains a six-point benefits grid, a
+  four-step wallet top-up guide (amounts and networks mirror
+  `topup_service.TOPUP_AMOUNTS` / `CRYPTO_NETWORKS` — keep the
+  `landing.charge3Body` string in sync), a closing CTA band and topbar section
+  links. `index.html` now carries a descriptive title, meta description,
+  Open Graph/Twitter tags, `WebApplication` JSON-LD and a `<noscript>`
+  fallback; the page sets a localised `<title>`/description per language.
+  New `public/favicon.svg` and `public/robots.txt` (disallows `/api/`).
+- **Cloudflare Turnstile CAPTCHA on login and sign-up.** Enforced when
+  `TURNSTILE_SECRET` is set; `GET /auth/config` hands the browser
+  `turnstile_site_key`, `LoginPage.jsx` renders `Turnstile.jsx` (actions
+  `login` / `signup`, reset after every attempt), and `auth.py` verifies the
+  token via siteverify (action + `TURNSTILE_HOSTNAMES` check, fails closed)
+  before touching the account. `app/services/turnstile_service.py`,
+  `tests/test_turnstile.py`.
+- **Balance top-up requests (crypto).** The balance chip opens a request form
+  (email, $5/$10/$20/$30, crypto network). Admin emails the wallet address from
+  the new *Top-ups* admin tab (SMTP via `SMTP_*`, `mailto:` fallback), the user
+  marks it paid, the admin confirms and the balance is credited. New
+  `topup_requests` table, `app/api/v1/endpoints/billing.py`,
+  `app/services/topup_service.py`, `tests/test_topup.py`.
+### Changed
+- New accounts start with `$0.07` (`DEFAULT_USER_BALANCE`, was `$0.50`).
+- The 402 "balance exhausted" message points users at the top-up form.
+- **Create a workflow with AI (admin panel).** A *Create with AI* button next
+  to *New workflow* opens `WizardGenerator.jsx`. The admin describes the goal,
+  the intended users, the number of steps (or leaves it to the AI) and a message
+  cap. `POST /admin/wizards/draft` drafts the whole workflow: bilingual title
+  and description, an icon, and each step's names, guideline prompt and cap.
+  The model is given the agent's real tool catalog. Nothing is saved at this
+  point. Guideline prompts that name tools the agent doesn't have come back as
+  `warnings`, and the slug is de-duplicated. The admin edits the draft and
+  creates it unpublished in one request: `POST /admin/wizards` now accepts
+  `steps`, created in the same transaction. Parsing and validation live in the
+  pure `wizard_service.parse_wizard_draft`, tested in `tests/test_wizard.py`.
+  Admin tooling is not billed.
+- **Two new seeded wizards** (`scripts/seed_wizards.py`):
+  - *Find a title for your thesis or paper* (`find-suitable-title-for-thesis`).
+    Four steps: constraints, recent-research scan, candidate titles, then a
+    novelty check and the final title. It reuses the slug of the empty admin
+    draft, so seeding fills in that draft.
+  - *Back your text with recent, reliable references*
+    (`enrich-with-references`). Four steps: claims needing support, a
+    recency-filtered search, `resolve_citation` checks, then citations woven
+    into the user's text.
+- `scripts/seed_wizards.py --only <slug> ...` seeds only the named wizards and
+  leaves the rest alone, so an admin's edits to other wizards are not reset.
+- `search_openalex` takes an optional `from_year` that limits results to
+  recent publications (OpenAlex `from_publication_date` filter).
+
+### Changed
+- **Lower per-turn LLM cost.** A LangSmith trace of one 7-turn wizard thread
+  showed the summarizer taking ~39% of spend. Three fixes:
+  - `SummarizationMiddleware` in `AcademicAgent` now triggers at 60k tokens
+    (was 4k, below the ~8k-token static prefix) and keeps the last ~15k tokens
+    (was 20 messages). The old trigger re-summarized before nearly every model
+    call in a tool loop, and each rewrite broke the prompt cache.
+  - `update_plan` accepts `step_indices` to mark several steps in one call. The
+    prompt and `skills.md` now say to update only after real progress. The
+    agent had been making 8 back-to-back single-step calls, each a full
+    model round-trip.
+  - Literature search output is smaller: `max_results` is capped at 10 (was
+    25), abstract snippets are 200 chars (was 300), and listings show the first
+    3 authors + "et al." `resolve_citation` still returns full author lists.
+
+### Fixed
+- **"Browse workflows" no longer opens the app.** Its `href="#catalog"` was
+  parsed by the hash router as an unknown route; in-page links now scroll.
+- **Markdown tables in agent replies rendered as one run-on paragraph.**
+  `react-markdown` was used without `remark-gfm`, so GFM pipe tables were not
+  parsed. `Message.jsx` and `GuidelinesPage.jsx` now pass `remarkGfm`; tables
+  get borders and scroll horizontally inside the chat bubble.
+- **Agent chat crashed with reasoning models on `/v1/chat/completions`.** The
+  provider rejects function tools when a reasoning effort is in play
+  (`Function tools with reasoning_effort are not supported for <model> in
+  /v1/chat/completions. To use function tools, use /v1/responses or set
+  reasoning_effort to 'none'.`). Both agents now build their `ChatOpenAI` with
+  `agent_chat_kwargs()` (`app/repositories/llm.py`), driven by two new settings:
+  `AGENT_REASONING_EFFORT` (default `"none"`, empty means send nothing) and
+  `AGENT_USE_RESPONSES_API` (route agent calls to `/v1/responses`, which allows
+  tools *with* reasoning). Only tool-bound models need this; plain
+  `.invoke()` tool code is unaffected.
+
+### Added
+- **`powerpoint.md` — presentation source for the product deck.** A slide-by-slide
+  spec (26 slides, five acts) covering every capability area in `feature.md`,
+  plus deck settings, brand colors lifted from `frontend/src/styles.css`,
+  per-slide speaker notes, a screenshot capture list, and short/technical/Persian
+  variants. It is written to be handed to Claude to generate
+  `dist/academic-co-pilot.pptx` via `uv run --with python-pptx python
+  scripts/build_deck.py`. Update `feature.md` first, then reflect changes here.
+- **Admin switch to open or close user registration.** A new singleton
+  `site_settings` row (`app/models/site.py`) holds site-wide switches an admin
+  can flip at runtime — first one is `registration_open` (default open). When
+  closed, `POST /auth/register` returns 403 and the login screen hides the
+  sign-up link; the first-ever account is still allowed through so a fresh
+  deployment can bootstrap its admin. New endpoints: public `GET /auth/config`,
+  admin `GET`/`PATCH /admin/settings`. The rule is the pure
+  `registration_allowed` in `app/services/site_settings_service.py`
+  (`tests/test_site_settings.py`); UI is the **Site** tab of the admin console
+  (`frontend/src/components/SiteSettingsPanel.jsx`). DDL parity:
+  `migrations/20260812_add_site_settings.sql`.
+- **Dynamic wizards — admin-authored guided workflows (en/fa).** Admins define a
+  `Wizard` (unique slug, internal `name`, and per-language `title_*` /
+  `short_description_*`) with an ordered list of `WizardStep`s; each step carries
+  a `guideline_prompt` that steers the agent and a `max_messages` cap. A user
+  picks one from a **public** landing page (`#/`, no token required), signs in,
+  and runs it as a guided chat: the current step's prompt is injected every turn
+  through the per-turn context channel, and using up the step's cap advances the
+  run automatically — exhausting the last step's cap completes it. The transcript
+  is persisted as real rows (`wizard_messages`), not just checkpointer state, so
+  a run can be left and continued.
+  - New models (`app/models/wizard.py`): `Wizard`, `WizardStep`, `WizardRun`,
+    `WizardMessage`; DDL parity file `migrations/20260811_add_wizard.sql`.
+  - The step state machine and localisation helpers are pure functions in
+    `app/services/wizard_service.py` (`apply_turn`, `next_step_id`,
+    `reordered_positions`, `resolve_locale`, `localized`, `slugify`,
+    `build_step_guidance`), unit-tested offline in `tests/test_wizard.py`.
+    `apply_turn` compares with `>=` so a cap an admin lowers mid-step still
+    terminates, and treats a `NULL`/`0`/negative cap as *unlimited*.
+  - API (`app/api/v1/endpoints/wizard.py`): public `GET /wizards`,
+    `GET /wizards/{slug}`; authenticated `POST /wizard-runs` (start **or**
+    resume, returning the transcript in one call), `GET /wizard-runs`,
+    `GET /wizard-runs/{id}`, `POST /wizard-runs/{id}/messages`,
+    `POST /wizard-runs/{id}/resume`, `DELETE /wizard-runs/{id}`; admin CRUD under
+    `/admin/wizards` and `/admin/wizard-steps` including a reorder route.
+    Language is chosen per request with `?lang=en|fa`; public routes return text
+    already resolved for that language and never expose `guideline_prompt`.
+    Admin write schemas also accept the original field spellings
+    (`gaurdline_prompt`, `max_masseage`) as aliases.
+  - **Three ways a step ends.** Its `max_messages` cap running out (automatic),
+    the user pressing **Finish step** (`POST /wizard-runs/{id}/advance` — no
+    agent call, so it costs nothing), or the user accepting the agent's
+    suggestion. The agent signals "this step's goal is met" by appending a
+    `[[STEP_COMPLETE]]` marker, which is stripped before the reply is persisted
+    or shown and returned as `step_complete_suggested`; it never auto-advances,
+    because moving on is the user's decision. A text marker rather than a tool,
+    since the wizard runs on the shared agent and a wizard-only tool would have
+    to be hidden from every other caller of `default_tools`. This also makes an
+    **uncapped step usable** — previously it parked the run forever.
+  - Runs execute on the existing shared `AcademicAgent` — no third graph. Each
+    run is backed by a real `ChatSession` (`agent_type="wizard"`) whose id is the
+    LangGraph `thread_id`, so uploads and the history/plan endpoints work
+    unchanged. Three guards keep the counter honest: `POST /chat` and
+    `DELETE /sessions/{id}` return 409 for a wizard thread, and wizard sessions
+    are excluded from the chat sidebar.
+  - `screen_message` gained `scope_check: bool = True`
+    (`app/agents/guardrails.py`). A wizard can opt out of the *academic scope*
+    classifier via `Wizard.enforce_scope_guardrail` while the deterministic
+    jailbreak rules always run. A blocked turn persists nothing and does not
+    burn a step allowance.
+  - `chat.py`'s `_build_context_message` / `_final_text` moved to
+    `app/agents/context.py` (`build_session_context`, `final_text`) and are now
+    shared by both endpoints.
+  - Frontend: a public bilingual landing page plus the run/continue UI —
+    `WizardLanding`, `WizardCard`, `WizardDetail`, `WizardRunner`,
+    `WizardStepper` (sticky under the topbar, with the Finish control),
+    `WizardRunsPage`, `WizardAdminPanel` (a tab inside the existing Admin
+    page), `WizardEditor`, `LangToggle`, `WizardIcon`. Two new dependency-free modules back them:
+    `frontend/src/i18n.js` (en/fa dictionary, `LangProvider`, `useT`, keeps
+    `<html lang|dir>` in sync) and `frontend/src/router.js` (a small hash router
+    — `#/`, `#/wizards/:slug`, `#/runs/:id`, `#/runs`, `#/app` — mounted above
+    the app's auth gate so the landing page is reachable while signed out;
+    wizard administration is a tab in the Admin page, not a route). Styling adds Crimson Pro / Atkinson Hyperlegible / Vazirmatn,
+    an additive token block, SVG icons instead of emoji, staggered reveals that
+    respect `prefers-reduced-motion`, and an `html[dir="rtl"]` patch block for
+    the older physically-positioned chat chrome.
+- **Chat UI/UX pass.** Audited the chat surface in a real browser against the
+  `ui-ux-pro-max` rule set and fixed what the measurements flagged:
+  - **Reading column.** Messages ran edge-to-edge across the pane; the
+    transcript and the composer now share a centred 56rem column, and message
+    text is 15px/1.65 (was 14px/1.5) since assistant replies are prose.
+  - **Scroll position is no longer stolen.** The window auto-scrolled on every
+    update, so a reply landing while you read back yanked you to the bottom.
+    It now follows only when you are already there, and offers a *Jump to
+    latest* pill when you are not.
+  - **Screen readers announce replies.** The transcript is a
+    `role="log"` / `aria-live="polite"` region; previously a new answer was
+    silent. The composer, the file input and the open-by-key field gained
+    accessible names, and the rename/delete buttons gained labels naming the
+    chat they act on.
+  - **Hit areas.** The rename/delete controls were 21×21px — kept visually
+    small but given a 44×44 target; Send 55×34 → 86×40, session title 22 → 34,
+    nav links 32 → 36.
+  - **Typing indicator.** The static "Co-Pilot is thinking…" line is now an
+    animated three-dot bubble shaped like the reply that is coming.
+  - **Icons.** `WizardIcon` is generalised to `Icon` and the chat's `✎`/`✕`/`+`
+    glyphs are SVG, matching the wizard surface; emoji can't take a colour
+    token and mean nothing to a screen reader.
+  - A shared focus-visible ring across chat, composer and sidebar controls.
+  - **Scrollbar moved back to the window edge.** The wizard transcript was both
+    the scroll container *and* the centred 56rem column, so its scrollbar sat at
+    the column's edge — floating mid-page, and on the inner edge in RTL. Split
+    into a full-width `.wz-thread` scroller with a `.wz-thread-inner` column,
+    matching the fix already applied to the chat.
+  - **Suggested follow-up questions.** A *Suggest questions* control above the
+    wizard composer asks a cheap model for three questions the user could send
+    next, given the step's goal and the tail of the conversation. Each is an
+    accordion: one line collapsed, expanding to the full question plus why it
+    helps, with a separate send icon so a stray click can never post something
+    unread. Written in the user's voice and in the active language, so the
+    chosen one is sent verbatim.
+    - **On demand, never automatic** (`POST /wizard-runs/{id}/suggestions`) —
+      it is a second LLM call and it is billed, so it only runs when asked.
+    - A plain model call, not an agent turn: no tools needed, and it must not
+      touch the LangGraph thread or land in the transcript.
+    - Prompt building and reply parsing are pure functions
+      (`build_suggestions_prompt`, `parse_suggestions`) tested offline; the
+      parser tolerates code fences and prose, drops duplicates and malformed
+      entries, and caps the count. The endpoint fails soft — a model error
+      returns no suggestions rather than blocking a user mid-conversation.
+  - **The Finish control names its destination** ("Next: screen results"), so
+    ending a step is a decision rather than a leap. Hidden below 640px where the
+    header is already tight.
+  - **Five shipped workflows, written out in full** (`scripts/seed_wizards.py`):
+    *Run a systematic literature review* (6 steps), *Analyse your dataset*,
+    *Understand a paper deeply*, *Write a research proposal* and *Get ready to
+    submit* (5 each) — 26 steps, each with bilingual (en/fa) names, a per-step
+    message cap, and a real `guideline_prompt` that drives the agent through the
+    app's actual tools (`screen_abstracts_csv`, `ingest_pdf`, `search_scopus`,
+    `analytics_sandbox`, `validate_references`, `compile_paper`, …). Until now
+    the product shipped with an empty catalogue and every demo needed a wizard
+    authored by hand first.
+    - Idempotent, matched by slug: missing wizards are created, existing ones
+      have their presentation fields refreshed, and **their steps are left
+      alone** so an admin's edits in the editor always win. `--replace-steps`
+      rewrites them, but is refused for any wizard with runs — a live run must
+      never lose the step it is sitting on.
+    - Unpublished by default (`--publish` to list them on the landing page), so
+      the content can be reviewed in the editor before users see it.
+  - **Bulk step authoring — paste an outline, get the steps.** An admin knows a
+    workflow's shape ("screen, ingest, plan, draft") before they know what each
+    step should say, but the editor only offered the full single-step form,
+    repeated. **Add many…** takes an outline — one step name per line — and
+    appends the whole sequence in order.
+    - `POST /admin/wizards/{id}/steps/bulk` (`StepBulkCreate`) with the outline,
+      one shared `max_messages`, and an optional `guideline_template`.
+    - Parsing is the pure `parse_step_outline`: it skips blank lines, strips
+      pasted list markers (`1.`, `2)`, `-`, `*`, `•`), splits `English | فارسی`
+      into both name columns and mirrors a one-sided name into the other, and
+      substitutes `{name}` into the guideline template *literally* (`str.format`
+      would raise on a brace in the prompt text). An empty outline or more than
+      `MAX_OUTLINE_STEPS` (50) is a **400** — never a silent truncation.
+      Unit-tested offline in `tests/test_wizard.py`.
+    - `create_steps` writes them in **one transaction**, so a wizard is never
+      left holding half an outline; positions continue from the existing steps
+      (the append position is now the shared `_append_position`).
+    - Each step lands with a placeholder prompt naming it, which is exactly the
+      part the admin then writes per step — the editor says so under the field.
+  - **File upload in the runner.** A workflow that says "upload your CSV of
+    abstracts" had nowhere to upload it: the runner had no attach control, even
+    though a run is backed by a real `ChatSession` and `POST /upload` +
+    `GET /sessions/{id}/files` have always accepted it. Frontend-only fix — a
+    paperclip in the composer and drag-and-drop anywhere over the runner, both
+    posting to the run's `session_id`.
+    - Uploaded files show as chips above the composer and are **re-loaded when a
+      run is resumed** (`SessionManager.get_files` rehydrates from
+      `data/<session_id>/`, so they outlive a browser session or a restart).
+    - PDFs are ingested into the vector store by the upload endpoint as usual;
+      per-file failures are surfaced rather than swallowed, since a PDF whose
+      text can't be extracted still uploads "successfully".
+    - Nothing is said in the transcript: the agent already sees the session's
+      files through `build_session_context` on the next turn. Attaching stays
+      enabled while the agent is replying for the same reason — the file is only
+      read on the following turn, so there is no race.
+  - **Wallet balance in the runner header.** A run spends the same credit as the
+    chat screen, so the remaining balance is now visible where it is being spent.
+    Seeded from the stored user (paints on the first frame), confirmed once via
+    `GET /auth/me` when the run opens, and updated from the `balance` every
+    billed response already carries — turns, resumes and suggestions — with no
+    extra request and no backend change. Turning red at zero mirrors
+    `.user-balance` in the chat top bar, and the update is written back through
+    `auth.patchUser` so both screens agree. The label collapses to the amount
+    below 640px; the amount stays LTR under the Persian layout.
 - **`feature.md` — complete feature catalogue.** A single document listing every
   user-facing capability grouped by area (the two agents and session binding,
   guardrails and HITL, literature discovery across Scopus/arXiv/Crossref/OpenAlex,

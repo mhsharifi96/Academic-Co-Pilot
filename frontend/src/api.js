@@ -6,8 +6,10 @@ import { authHeader, onUnauthorized } from "./auth.js";
 
 const BASE = "/api/v1";
 
-async function request(path, { method = "GET", body, isForm = false } = {}) {
-  const headers = { ...authHeader() };
+async function request(path, { method = "GET", body, isForm = false, anon = false } = {}) {
+  // `anon` requests are for the public wizard catalogue: they must work for a
+  // signed-out visitor, so they carry no token and never trigger a logout.
+  const headers = anon ? {} : { ...authHeader() };
   let payload = body;
   if (body && !isForm) {
     headers["Content-Type"] = "application/json";
@@ -15,7 +17,7 @@ async function request(path, { method = "GET", body, isForm = false } = {}) {
   }
   const res = await fetch(`${BASE}${path}`, { method, headers, body: payload });
 
-  if (res.status === 401) {
+  if (res.status === 401 && !anon) {
     onUnauthorized();
     throw new Error("Your session expired — please log in again.");
   }
@@ -105,6 +107,144 @@ export async function listDownloads(sessionId) {
   return request(`/downloads${qs}`);
 }
 
+// ----- Wizards (guided workflows) -----
+//
+// `lang` selects which language's content columns the server resolves; it is
+// not a UI-only concern, so every wizard call carries it.
+
+const lq = (lang) => `lang=${encodeURIComponent(lang || "en")}`;
+
+// Public: no token needed, works for signed-out visitors on the landing page.
+export async function listWizards(lang) {
+  return request(`/wizards?${lq(lang)}`, { anon: true });
+}
+
+export async function getWizard(slug, lang) {
+  return request(`/wizards/${encodeURIComponent(slug)}?${lq(lang)}`, { anon: true });
+}
+
+// Starts a run, or returns the caller's existing active run of the same wizard
+// (with its transcript), which is what "continue" uses.
+export async function startWizardRun({ wizardId, slug }, lang) {
+  return request(`/wizard-runs?${lq(lang)}`, {
+    method: "POST",
+    body: { wizard_id: wizardId, slug },
+  });
+}
+
+export async function listWizardRuns(status, lang) {
+  const s = status ? `&status=${encodeURIComponent(status)}` : "";
+  return request(`/wizard-runs?${lq(lang)}${s}`);
+}
+
+export async function getWizardRun(runId, lang) {
+  return request(`/wizard-runs/${encodeURIComponent(runId)}?${lq(lang)}`);
+}
+
+export async function sendWizardMessage(runId, message, lang) {
+  return request(`/wizard-runs/${encodeURIComponent(runId)}/messages?${lq(lang)}`, {
+    method: "POST",
+    body: { message },
+  });
+}
+
+// Ask for follow-up questions the user could send next. This IS an LLM call and
+// is billed, so it is only ever fired from an explicit user action.
+export async function suggestWizardQuestions(runId, lang) {
+  return request(`/wizard-runs/${encodeURIComponent(runId)}/suggestions?${lq(lang)}`, {
+    method: "POST",
+  });
+}
+
+// Finish the current step now, without spending its remaining messages. Costs
+// nothing — no agent call.
+export async function advanceWizardRun(runId, lang) {
+  return request(`/wizard-runs/${encodeURIComponent(runId)}/advance?${lq(lang)}`, {
+    method: "POST",
+  });
+}
+
+export async function resumeWizardRun(runId, decision, { editedArgs, reason } = {}, lang) {
+  return request(`/wizard-runs/${encodeURIComponent(runId)}/resume?${lq(lang)}`, {
+    method: "POST",
+    body: { decision, edited_args: editedArgs, reason },
+  });
+}
+
+export async function abandonWizardRun(runId) {
+  return request(`/wizard-runs/${encodeURIComponent(runId)}`, { method: "DELETE" });
+}
+
+// ----- Wizard admin -----
+
+export async function adminListWizards() {
+  return request("/admin/wizards");
+}
+
+export async function adminGetWizard(wizardId) {
+  return request(`/admin/wizards/${encodeURIComponent(wizardId)}`);
+}
+
+export async function adminCreateWizard(fields) {
+  return request("/admin/wizards", { method: "POST", body: fields });
+}
+
+// Ask the AI to draft a whole workflow from a description. Nothing is saved:
+// the draft comes back for review and is created with adminCreateWizard.
+export async function adminDraftWizard({ goal, audience, step_count, max_messages }) {
+  return request("/admin/wizards/draft", {
+    method: "POST",
+    body: { goal, audience, step_count, max_messages },
+  });
+}
+
+export async function adminUpdateWizard(wizardId, fields) {
+  return request(`/admin/wizards/${encodeURIComponent(wizardId)}`, {
+    method: "PATCH",
+    body: fields,
+  });
+}
+
+export async function adminDeleteWizard(wizardId) {
+  return request(`/admin/wizards/${encodeURIComponent(wizardId)}`, { method: "DELETE" });
+}
+
+export async function adminCreateStep(wizardId, fields) {
+  return request(`/admin/wizards/${encodeURIComponent(wizardId)}/steps`, {
+    method: "POST",
+    body: fields,
+  });
+}
+
+// Append a whole outline (one step name per line) in one request. Returns the
+// created steps, in order.
+export async function adminCreateSteps(wizardId, fields) {
+  return request(`/admin/wizards/${encodeURIComponent(wizardId)}/steps/bulk`, {
+    method: "POST",
+    body: fields,
+  });
+}
+
+export async function adminUpdateStep(stepId, fields) {
+  return request(`/admin/wizard-steps/${encodeURIComponent(stepId)}`, {
+    method: "PATCH",
+    body: fields,
+  });
+}
+
+export async function adminDeleteStep(stepId) {
+  return request(`/admin/wizard-steps/${encodeURIComponent(stepId)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function adminReorderSteps(wizardId, stepIds) {
+  return request(`/admin/wizards/${encodeURIComponent(wizardId)}/steps/reorder`, {
+    method: "PUT",
+    body: { step_ids: stepIds },
+  });
+}
+
 // ----- Account / admin -----
 
 export async function fetchMe() {
@@ -126,5 +266,79 @@ export async function adjustBalance(userId, amount) {
   return request(`/admin/users/${encodeURIComponent(userId)}/adjust-balance`, {
     method: "POST",
     body: { amount },
+  });
+}
+
+// ----- Site settings (admin) -----
+
+export async function getSiteSettings() {
+  return request("/admin/settings");
+}
+
+export async function setRegistrationOpen(open) {
+  return request("/admin/settings", {
+    method: "PATCH",
+    body: { registration_open: open },
+  });
+}
+
+// ----- Balance top-ups (paid in crypto) -----
+//
+// Flow: the user requests a top-up → an admin emails the wallet address for the
+// chosen network → the user pays and marks it paid → the admin confirms, which
+// credits the balance.
+
+export async function getTopUpOptions() {
+  return request("/billing/topup-options");
+}
+
+export async function listMyTopUps() {
+  return request("/billing/topup-requests");
+}
+
+export async function createTopUp({ email, amount, network }) {
+  return request("/billing/topup-requests", {
+    method: "POST",
+    body: { email, amount, network },
+  });
+}
+
+export async function markTopUpPaid(requestId, txHash) {
+  return request(`/billing/topup-requests/${encodeURIComponent(requestId)}/paid`, {
+    method: "POST",
+    body: { tx_hash: txHash || undefined },
+  });
+}
+
+export async function cancelTopUp(requestId) {
+  return request(`/billing/topup-requests/${encodeURIComponent(requestId)}/cancel`, {
+    method: "POST",
+  });
+}
+
+export async function adminListTopUps(status) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+  return request(`/admin/topup-requests${qs}`);
+}
+
+// Returns { request, email_sent, email_error, mailto }.
+export async function adminSendTopUpEmail(requestId, { walletAddress, note }) {
+  return request(
+    `/admin/topup-requests/${encodeURIComponent(requestId)}/send-payment-email`,
+    { method: "POST", body: { wallet_address: walletAddress, note: note || undefined } }
+  );
+}
+
+// Credits the user's balance. Returns { request, user_balance }.
+export async function adminConfirmTopUp(requestId) {
+  return request(`/admin/topup-requests/${encodeURIComponent(requestId)}/confirm`, {
+    method: "POST",
+  });
+}
+
+export async function adminRejectTopUp(requestId, reason) {
+  return request(`/admin/topup-requests/${encodeURIComponent(requestId)}/reject`, {
+    method: "POST",
+    body: { reason: reason || undefined },
   });
 }

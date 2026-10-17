@@ -20,6 +20,19 @@ class Settings(BaseSettings):
     POWERFUL_MODEL: str = "gpt-5.4-mini"
     # Image model used by the LLM repository's generate_image() (infographics).
     IMAGE_MODEL: str = "gpt-image-1"
+    # Reasoning effort sent with agent (tool-calling) requests. Some reasoning
+    # models reject function tools on /v1/chat/completions unless the effort is
+    # explicitly "none" ("Function tools with reasoning_effort are not supported
+    # for <model> in /v1/chat/completions"), so "none" is the safe default here.
+    # Set to null/empty to send no reasoning_effort at all, or to
+    # minimal|low|medium|high for a provider/model that accepts tools with
+    # reasoning (see AGENT_USE_RESPONSES_API below).
+    AGENT_REASONING_EFFORT: Optional[str] = "none"
+    # Route agent calls through the OpenAI Responses API instead of Chat
+    # Completions. Responses supports function tools together with real
+    # reasoning, so enable this (plus a non-"none" AGENT_REASONING_EFFORT) when
+    # the model should think before calling tools.
+    AGENT_USE_RESPONSES_API: bool = False
 
     # PostgreSQL / pgvector Configuration
     DATABASE_URL: str
@@ -46,6 +59,31 @@ class Settings(BaseSettings):
     # the "first account to register becomes admin" fallback in auth.register.
     ADMIN_EMAIL: Optional[str] = None
 
+    # ---- Cloudflare Turnstile (CAPTCHA on login / sign-up) -----------------
+    # Site key is public — sent to the browser via GET /auth/config. The secret
+    # is a BACKEND SECRET used only for siteverify. The CAPTCHA is enforced only
+    # when TURNSTILE_SECRET is set. TURNSTILE_HOSTNAMES is the comma-separated
+    # list of frontend hostnames a token may come from (siteverify's
+    # ``hostname``); in production it must not include localhost / 127.0.0.1.
+    TURNSTILE_SITE_KEY: Optional[str] = "0x4AAAAAAFZKGAU2CuTlYM5b"
+    TURNSTILE_SECRET: Optional[str] = None
+    TURNSTILE_HOSTNAMES: str = ""
+
+    # ---- Outgoing email (balance top-up payment instructions) --------------
+    # When SMTP_HOST is set, the admin's "Send payment email" action mails the
+    # wallet address to the user directly. When unset, the request is still
+    # marked as awaiting payment and the admin UI falls back to a mailto: link
+    # so the admin can send the same message from their own mail client.
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    # Sender address; falls back to SMTP_USER when unset.
+    SMTP_FROM: Optional[str] = None
+    # STARTTLS on SMTP_PORT (587). Set SMTP_USE_SSL=true instead for port 465.
+    SMTP_USE_TLS: bool = True
+    SMTP_USE_SSL: bool = False
+
     # Authentication (JWT)
     JWT_SECRET: str = "change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
@@ -64,7 +102,7 @@ class Settings(BaseSettings):
     # metering entirely (useful for local development / the test suite).
     ENABLE_BILLING: bool = True
     # Dollars granted to a brand-new account.
-    DEFAULT_USER_BALANCE: float = 0.5
+    DEFAULT_USER_BALANCE: float = 0.07
     # A user is blocked from starting a new turn once balance <= this value.
     MIN_BALANCE_TO_CHAT: float = 0.0
     # Token prices in USD per 1,000,000 tokens, used to convert measured token

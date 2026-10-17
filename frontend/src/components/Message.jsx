@@ -1,4 +1,5 @@
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { getToken } from "../auth.js";
 import { extractDois } from "../util/doi.js";
 
@@ -63,7 +64,11 @@ export default function Message({ role, content, onRequestPdf }) {
     return (
       <div className="msg user">
         <div className="role">You</div>
-        <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+        {/* dir="auto" so each message reads in ITS OWN direction: the UI can be
+            Persian (RTL) while a given message is English, or the reverse.
+            Without it the bubble inherits the page direction and bidi reorders
+            the text — trailing punctuation jumps to the front. */}
+        <div dir="auto" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
           {content}
         </div>
         {doiActions}
@@ -74,8 +79,11 @@ export default function Message({ role, content, onRequestPdf }) {
   return (
     <div className="msg assistant">
       <div className="role">Co-Pilot</div>
-      <div className="md">
+      <div className="md" dir="auto">
         <ReactMarkdown
+          // GFM adds tables, strikethrough and autolinks; plain CommonMark
+          // renders a pipe table as one run-on paragraph.
+          remarkPlugins={[remarkGfm]}
           components={{
             a({ href, children, ...props }) {
               if (isArtifactPath(href)) {
@@ -95,6 +103,15 @@ export default function Message({ role, content, onRequestPdf }) {
                 <a href={href} target="_blank" rel="noreferrer" {...props}>
                   {children}
                 </a>
+              );
+            },
+            // Wide tables (e.g. literature matrices) scroll inside the bubble
+            // instead of overflowing it.
+            table({ children }) {
+              return (
+                <div className="md-table-wrap">
+                  <table>{children}</table>
+                </div>
               );
             },
             img({ src, alt }) {
