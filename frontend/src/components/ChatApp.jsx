@@ -1,26 +1,27 @@
-import { useCallback, useEffect, useState } from "react";
-import * as api from "./api.js";
-import * as auth from "./auth.js";
-import SessionBar from "./components/SessionBar.jsx";
-import SessionList from "./components/SessionList.jsx";
-import FileSidebar from "./components/FileSidebar.jsx";
-import PlanSidebar from "./components/PlanSidebar.jsx";
-import ChatWindow from "./components/ChatWindow.jsx";
-import DownloadModal from "./components/DownloadModal.jsx";
-import DownloadsPage from "./components/DownloadsPage.jsx";
-import MessageInput from "./components/MessageInput.jsx";
-import GuidelinesPage from "./components/GuidelinesPage.jsx";
-import AdminPage from "./components/AdminPage.jsx";
-import LoginPage from "./components/LoginPage.jsx";
-import WizardDetail from "./components/WizardDetail.jsx";
-import WizardLanding from "./components/WizardLanding.jsx";
-import WizardRunner from "./components/WizardRunner.jsx";
-import WizardRunsPage from "./components/WizardRunsPage.jsx";
-import { navigate, replace, useHashRoute } from "./router.js";
+"use client";
 
-// The existing chat application. `user` is owned by the router shell below so
-// the public wizard pages can render before this component's auth gate.
-function ChatApp({ user, setUser }) {
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import * as api from "../api.js";
+import * as auth from "../auth.js";
+import { localePath, useT } from "../i18n.js";
+import SessionBar from "./SessionBar.jsx";
+import SessionList from "./SessionList.jsx";
+import FileSidebar from "./FileSidebar.jsx";
+import PlanSidebar from "./PlanSidebar.jsx";
+import ChatWindow from "./ChatWindow.jsx";
+import DownloadModal from "./DownloadModal.jsx";
+import DownloadsPage from "./DownloadsPage.jsx";
+import MessageInput from "./MessageInput.jsx";
+import GuidelinesPage from "./GuidelinesPage.jsx";
+import AdminPage from "./AdminPage.jsx";
+import LoginPage from "./LoginPage.jsx";
+
+// The chat application (route /app). `user` is owned by the page so it can
+// honour a `?next=` destination after sign-in.
+export default function ChatApp({ user, setUser }) {
+  const router = useRouter();
+  const { lang } = useT();
   const [sessionId, setSessionId] = useState(null);
   const [sessions, setSessions] = useState([]); // {id, title, updated_at}
   const [messages, setMessages] = useState([]); // {role, content}
@@ -320,10 +321,12 @@ function ChatApp({ user, setUser }) {
         sessionId={sessionId}
         onNewSession={startNewSession}
         view={view}
-        // The wizard pages live on their own hash routes so their links are
-        // shareable; that nav item hands over to the router instead of
-        // switching this component's local view.
-        onNavigate={(next) => (next === "wizards" ? navigate("/") : setView(next))}
+        // The wizard pages live on their own routes so their links are
+        // shareable (and crawlable); that nav item hands over to the router
+        // instead of switching this component's local view.
+        onNavigate={(next) =>
+          next === "wizards" ? router.push(localePath(lang, "/")) : setView(next)
+        }
         user={user}
         onLogout={handleLogout}
         onBalance={(balance) => setUser((u) => (u ? auth.patchUser({ balance }) : u))}
@@ -405,60 +408,4 @@ function ChatApp({ user, setUser }) {
       )}
     </div>
   );
-}
-
-// Where the user was headed before the login gate stopped them, so they land on
-// the wizard they clicked rather than on the chat home page.
-const PENDING_KEY = "paperagent.pendingRoute";
-
-export default function App() {
-  const [user, setUser] = useState(() => auth.getUser());
-  const { route } = useHashRoute();
-
-  // The 401 handler fires from anywhere in the app; clearing `user` here is
-  // what swaps the whole tree back to the login screen.
-  useEffect(() => {
-    const handler = () => setUser(null);
-    window.addEventListener("auth:logout", handler);
-    return () => window.removeEventListener("auth:logout", handler);
-  }, []);
-
-  // Resume an interrupted destination once the user signs in.
-  useEffect(() => {
-    if (!user) return;
-    let pending = null;
-    try {
-      pending = sessionStorage.getItem(PENDING_KEY);
-      sessionStorage.removeItem(PENDING_KEY);
-    } catch {
-      /* storage disabled */
-    }
-    if (pending) replace(pending);
-  }, [user]);
-
-  function requireLogin(slug) {
-    try {
-      sessionStorage.setItem(PENDING_KEY, `/wizards/${encodeURIComponent(slug)}`);
-    } catch {
-      /* storage disabled */
-    }
-    navigate("/app");
-  }
-
-  // Public routes render ahead of ChatApp's auth gate.
-  if (route.name === "landing") return <WizardLanding user={user} />;
-  if (route.name === "wizard") {
-    return (
-      <WizardDetail slug={route.params.slug} user={user} onRequireLogin={requireLogin} />
-    );
-  }
-
-  // Everything below needs an account. Falling through to ChatApp shows its
-  // login screen, and the pending-route effect above brings them back here.
-  if (user) {
-    if (route.name === "run") return <WizardRunner runId={route.params.runId} />;
-    if (route.name === "runs") return <WizardRunsPage />;
-  }
-
-  return <ChatApp user={user} setUser={setUser} />;
 }

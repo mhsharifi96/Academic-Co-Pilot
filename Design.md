@@ -10,11 +10,11 @@ and `project_structure.md` (where).
 - **Data:** PostgreSQL + pgvector.
 - **Auth:** JWT bearer + bcrypt.
 - **Tracing:** LangSmith (optional).
-- **Packaging/Deploy:** uv, Docker Compose (db + app + nginx-served React UI).
+- **Packaging/Deploy:** uv, Docker Compose (db + app + Next.js frontend server).
 
 ## High-level diagram
 ```
-React SPA ──HTTP /api──> FastAPI routers ──> AcademicAgent (singleton on app.state)
+Next.js ──HTTP /api──> FastAPI routers ──> AcademicAgent (singleton on app.state)
                               │                     │
                               │                     ├─ SummarizationMiddleware
                               │                     ├─ HumanInTheLoopMiddleware ──(interrupt)──┐
@@ -146,6 +146,8 @@ tool list, document in `skills.md`, and (if it executes code / mutates state)
 add it to `INTERRUPT_TOOLS`. No router or graph changes needed.
 
 ## Known limitations
+- Auth is client-side (JWT in localStorage), so only the public pages are
+  server-rendered; the signed-in app renders after hydration and is `noindex`.
 - `SessionManager` is in-process → single-worker assumption for file/interrupt state.
 - OpenAI-only; model set via `OPENAI_MODEL`.
 - `analytics_sandbox` uses `PythonREPL` (not a hardened sandbox) — HITL approval

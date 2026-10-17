@@ -5,7 +5,7 @@ is the "what can it do" document; for *why* see `PRD.md`, for *how* see
 `Design.md`, for *where the code lives* see `project_structure.md`, and for the
 tool input schemas injected into the agent prompt see `skills.md`.
 
-Academic Co-Pilot is an agentic RAG assistant (FastAPI backend + React/Vite SPA)
+Academic Co-Pilot is an agentic RAG assistant (FastAPI backend + Next.js frontend)
 that takes a researcher from raw PDFs and CSVs to a screened spreadsheet, an
 outline, cited draft sections, charts, and a compiled `.docx` — without leaving
 the chat.
@@ -359,7 +359,7 @@ UI: the **Site** tab of `AdminPage.jsx` (`SiteSettingsPanel.jsx`).
 
 ---
 
-## 11. Frontend (React/Vite SPA)
+## 11. Frontend (Next.js)
 
 - **Chat** with markdown rendering, inline images for generated charts, and
   clickable download links for produced artifacts.
@@ -372,11 +372,15 @@ UI: the **Site** tab of `AdminPage.jsx` (`SiteSettingsPanel.jsx`).
 - **Downloads tab + DOI chips + status cards** — queue a PDF by DOI, watch job
   status, and recover from failures (upload manually or continue without).
 - **Wizard landing page** — a **public**, bilingual (en/fa, RTL-aware) catalogue of
-  guided workflows at `#/`, reachable without signing in; picking one leads to a
+  guided workflows at `/` (Persian at `/fa`), server-rendered and reachable without signing in; picking one leads to a
   detail page with the step outline, then to the runner. Also carries a
   "why us" benefits grid, a four-step "how to top up your wallet" guide (crypto,
   pay-as-you-go), a closing sign-up CTA, and SEO metadata (meta description,
   Open Graph/Twitter, JSON-LD, localised `<title>`).
+- **SEO** — public pages are server-rendered HTML with per-language URLs,
+  canonical + `hreflang` alternates, `WebApplication` / `HowTo` JSON-LD, a
+  dynamic `sitemap.xml` listing every published wizard in both languages, and
+  `robots.txt`; the signed-in app is `noindex`.
 - **Suggested questions** — on request, three follow-up questions tailored to the
   current step, each expandable for the full text and a reason, each sendable
   with one click.
@@ -411,9 +415,9 @@ UI: the **Site** tab of `AdminPage.jsx` (`SiteSettingsPanel.jsx`).
 - **Guidelines page** — in-app usage guidance.
 - **Admin page** — user/balance management for admins.
 - **Balance indicator** in the top bar.
-- Auth is handled in `auth.js`; `api.js` wraps every backend route. nginx (Docker)
-  or Vite (dev) proxy `/api` to the backend, so **no CORS config is needed** in
-  either mode.
+- Auth is handled in `auth.js`; `api.js` wraps every backend route. Next.js
+  rewrites `/api` to the backend (dev and Docker alike), so **no CORS config is
+  needed**.
 
 ---
 

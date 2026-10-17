@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 
 // Renders the human-in-the-loop approval panel for the tool call(s) the agent

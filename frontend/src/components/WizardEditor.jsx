@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useState } from "react";
 import * as api from "../api.js";
 import { useT } from "../i18n.js";

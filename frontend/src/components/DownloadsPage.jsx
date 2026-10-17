@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import { createDownload } from "../api.js";
 import DownloadStatus from "./DownloadStatus.jsx";

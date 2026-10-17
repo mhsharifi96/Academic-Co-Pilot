@@ -1,3 +1,5 @@
+"use client";
+
 const STATUS_ICON = {
   done: "✓",
   in_progress: "◔",

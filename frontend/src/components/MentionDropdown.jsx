@@ -1,3 +1,5 @@
+"use client";
+
 export default function MentionDropdown({ items, activeIndex, onPick }) {
   if (items.length === 0) {
     return (

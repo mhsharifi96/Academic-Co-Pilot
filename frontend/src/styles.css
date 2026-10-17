@@ -3626,3 +3626,35 @@ button.balance-btn:hover {
   justify-content: center;
   min-height: 65px;
 }
+
+/* ---------- Next.js: links styled as the buttons they replaced ----------
+   The public pages are server-rendered, so navigation uses real <a href>
+   links (crawlable, middle-clickable) instead of onClick buttons. */
+html {
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+a.wz-btn,
+a.wz-card,
+a.wz-back,
+a.nav-link {
+  text-decoration: none;
+}
+a.wz-topnav-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+a.lang-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+section[id] {
+  scroll-margin-top: 5rem;
+}

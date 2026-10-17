@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Academic Co-Pilot ("PaperAgent") — an agentic RAG backend (FastAPI) plus a React/Vite SPA. A single LangChain 1.0 `create_agent` (LangGraph state machine) helps researchers screen literature, ingest PDFs, plan/draft papers with citations, and run data analysis in a sandbox. Despite the folder name (`django/PaperAgent`), there is **no Django** — this is FastAPI.
+Academic Co-Pilot ("PaperAgent") — an agentic RAG backend (FastAPI) plus a Next.js (App Router) frontend. A single LangChain 1.0 `create_agent` (LangGraph state machine) helps researchers screen literature, ingest PDFs, plan/draft papers with citations, and run data analysis in a sandbox. Despite the folder name (`django/PaperAgent`), there is **no Django** — this is FastAPI.
 
 ## Companion docs
 
@@ -24,13 +24,13 @@ Several `.md` files at the repo root cover the same system from different angles
 Dependencies are managed with **uv** (not pip/poetry).
 
 ```bash
-# Full stack (db + api + nginx-served UI) — UI at :5173, API at :8000, Swagger at :8000/docs
+# Full stack (db + api + Next.js UI) — UI at :5173, API at :8000, Swagger at :8000/docs
 docker-compose up --build
 
 # Backend only, hot reload (needs Postgres reachable via DATABASE_URL)
 uv run uvicorn app.main:app --reload
 
-# Frontend dev server with hot reload (proxies /api -> :8000, configured in frontend/vite.config.js)
+# Frontend dev server with hot reload (proxies /api -> $BACKEND_URL, default :8000; see frontend/next.config.mjs)
 cd frontend && npm install && npm run dev
 
 # Tests
@@ -42,7 +42,7 @@ python tests/run_all.py                # stdlib-only fallback runner (no pytest 
 
 Tests run **fully offline**: `tests/conftest.py` sets dummy `OPENAI_API_KEY`/`DATABASE_URL` and disables LangSmith tracing *before* any app module imports (settings are validated at import time, so this ordering matters).
 
-> Run **either** the Docker `frontend` service **or** the local Vite dev server — both bind port 5173.
+> Run **either** the Docker `frontend` service **or** the local Next dev server — both bind port 5173.
 
 ## Configuration
 
@@ -124,7 +124,11 @@ JWT bearer (`app/core/security.py`): `get_current_user` protects endpoints; bcry
 `@tool` functions, all synchronous: `screener.py` (CSV→color-coded Excel), `ingestor.py` (PDF→chunks→pgvector), `planner.py` (titles/outline/section list), `drafter.py` (RAG draft per section, optional CSV grounding via `_summarize_data_files`, IEEE/APA/Vancouver), `sandbox.py` (`PythonREPL`, saves plots to `output_figures/`), `file_utils.py` (`get_csv_info`, `list_session_files`).
 
 ### Frontend (`frontend/src/`)
-React SPA. `api.js` wraps the backend; `auth.js` stores the JWT in localStorage and dispatches `auth:logout` on any 401. Components cover chat, file sidebar, `@`-mention file picker, and the Approve/Edit/Reject interrupt card. nginx (Docker) or Vite (dev) proxy `/api` to the backend, so no CORS config is needed in either mode.
+Next.js 15 App Router (JS, no TypeScript). Two kinds of routes:
+- **Public, server-rendered, indexed** — `/`, `/wizards/[slug]` and their Persian twins `/fa`, `/fa/wizards/[slug]`. Server Components fetch the catalogue from FastAPI (`src/lib/server-api.js`, `BACKEND_URL`) per request and emit metadata, canonical + hreflang, JSON-LD (`src/lib/seo.js`), plus `sitemap.xml`/`robots.txt` (`src/app/sitemap.js`, `robots.js`). There are **two root layouts** — `app/(en)` and `app/fa` — so `<html lang/dir>` is right in the server HTML. Translate on the server with `translate()` from `src/i18n/strings.js`; `src/i18n.js` is the client provider (`useT`). Only signed-in-aware bits are client islands (`UserAware.jsx`, `StartWizardButton.jsx`).
+- **App, client-only, `noindex`** — `/app` (chat + the login screen), `/runs`, `/runs/[id]` under `app/(en)/(app)`. The JWT lives in localStorage, so auth is client-side (`AuthGate.jsx`: `useAuthUser`, `RequireAuth`); a signed-out visitor goes to `/app?next=<path>` and returns after login (`safeNext` only allows same-site paths).
+
+`api.js` wraps the backend with relative `/api` paths; `auth.js` stores the JWT and dispatches `auth:logout` on any 401. Next rewrites `/api/*` to `BACKEND_URL` (baked in at **build** time — the Dockerfile takes it as a build arg; `proxyTimeout` is 600s for long agent turns), so no CORS config is needed. Old hash links (`#/wizards/x`) are forwarded by `LegacyHashRedirect.jsx`. Every component that uses hooks/browser APIs starts with `"use client"`.
 
 ## Conventions
 

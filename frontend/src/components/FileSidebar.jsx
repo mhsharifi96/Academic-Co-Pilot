@@ -1,3 +1,5 @@
+"use client";
+
 import { useRef, useState } from "react";
 
 export default function FileSidebar({ files, onUpload, onInsertPath, busy }) {

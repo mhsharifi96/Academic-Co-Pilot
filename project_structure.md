@@ -63,12 +63,18 @@ PaperAgent/
 │       ├── venue_suggester.py    # suggest_venues        -> journals/conferences/publishers (OpenAlex)
 │       └── exporter.py           # compile_paper        -> assembles sections to .docx [gated]
 │
-├── frontend/                     # React + Vite SPA
+├── frontend/                     # Next.js 15 App Router (SSR public pages + client app)
 │   ├── src/
-│   │   ├── App.jsx               # Root: hash router shell (public wizard routes above the
-│   │   │                          #   auth gate) wrapping ChatApp (login/chat/guidelines)
-│   │   ├── router.js             # useHashRoute/navigate: #/, #/wizards/:slug, #/runs/:id, #/app
-│   │   ├── i18n.js               # en/fa dictionary, LangProvider/useT, keeps <html lang|dir>
+│   │   ├── app/
+│   │   │   ├── (en)/             # Root layout <html lang="en">: / and /wizards/[slug] (SSR, indexed)
+│   │   │   │   └── (app)/        # /app (chat + login), /runs, /runs/[id] — client-only, noindex
+│   │   │   ├── fa/               # Root layout <html lang="fa" dir="rtl">: /fa, /fa/wizards/[slug]
+│   │   │   ├── sitemap.js        # sitemap.xml: public pages in both languages (hreflang)
+│   │   │   └── robots.js         # robots.txt: disallows /api/, /app, /runs
+│   │   ├── lib/                  # server-api.js (server-side catalogue fetch), seo.js (metadata,
+│   │   │                         #   JSON-LD), pages.jsx (shared per-locale routes), RootDocument
+│   │   ├── i18n/strings.js       # en/fa dictionary + translate()/localePath() (server-safe)
+│   │   ├── i18n.js               # Client LangProvider/useT, keeps <html lang|dir>
 │   │   ├── api.js                # Backend API wrapper (`anon: true` for the public catalogue)
 │   │   ├── auth.js               # JWT in localStorage; dispatches auth:logout on 401
 │   │   ├── util/doi.js           # extractDois(): detect DOIs in assistant messages
@@ -76,10 +82,10 @@ PaperAgent/
 │   │                             #   MentionDropdown, Message, MessageInput, SessionBar/List, GuidelinesPage,
 │   │                             #   DownloadModal, DownloadStatus (provider PDF download UI),
 │   │                             #   WizardLanding/Card/Detail/Runner/Stepper/RunsPage,
-│   │                             #   WizardAdminPanel, WizardEditor, WizardGenerator (AI builder), LangToggle, Icon
-│   ├── vite.config.js            # Dev server proxies /api -> :8000
-│   ├── nginx.conf                # Prod: serves bundle, proxies /api -> app:8000
-│   └── Dockerfile
+│   │                             #   WizardAdminPanel, WizardEditor, WizardGenerator (AI builder), LangToggle, Icon,
+│   │                             #   ChatApp (/app), AuthGate (client auth + ?next=), UserAware, StartWizardButton
+│   ├── next.config.mjs           # Rewrites /api -> BACKEND_URL (build-time), standalone output
+│   └── Dockerfile                # Multi-stage; runs the standalone Node server on :3000
 │
 ├── tests/                        # pytest (run offline via conftest dummy env)
 │   ├── conftest.py               # Sets dummy env BEFORE app imports
@@ -93,7 +99,7 @@ PaperAgent/
 ├── output_figures/              # Sandbox-generated charts (.png)
 ├── skills.md                     # Tool catalog injected into the agent system prompt
 ├── master_prompt.md             # Original build brief (historical context)
-├── docker-compose.yml            # db (pgvector) + app (FastAPI) + frontend (nginx)
+├── docker-compose.yml            # db (pgvector) + app (FastAPI) + frontend (Next.js)
 ├── Dockerfile                    # Backend image (uv-based)
 ├── pyproject.toml                # Deps (uv); pytest config
 └── .env.example                  # Required env vars template
@@ -107,5 +113,5 @@ PaperAgent/
 - **PDF download queue:** scheduling/quota/fairness/retry rules are pure functions in `app/services/download_service.py` (unit-tested in `tests/test_downloads.py`); the background loop is `app/core/download_worker.py`. Keep the provider token backend-only.
 - **Shipped wizard content:** edit `scripts/seed_wizards.py` and re-run it (`--replace-steps` to overwrite steps of wizards nobody has run yet). It is content, not schema — run it with the repo root on `PYTHONPATH`, e.g. `docker exec -w /app -e PYTHONPATH=/app paper_agent_app python scripts/seed_wizards.py --publish`.
 - **Wizards:** the step state machine lives in pure functions in `app/services/wizard_service.py` (unit-tested in `tests/test_wizard.py`) — change `apply_turn` there, not in the endpoint. A wizard run is backed by a `ChatSession` with `agent_type="wizard"`; that thread must only be advanced through `/wizard-runs/{id}/messages` (`POST /chat` and `DELETE /sessions/{id}` 409 on it).
-- **New UI string:** add the key to both `en` and `fa` in `frontend/src/i18n.js` and read it with `useT()`. New CSS for the wizard surface must use logical properties (`margin-inline`, `text-align: start`) so it mirrors under `dir="rtl"` without an override.
-- **New frontend page:** add a case to `parseRoute` in `frontend/src/router.js` and a branch in `App`'s router shell — above the auth gate if it should be public.
+- **New UI string:** add the key to both `en` and `fa` in `frontend/src/i18n/strings.js`; read it with `useT()` in client components or `translate(lang, key)` in Server Components. New CSS for the wizard surface must use logical properties (`margin-inline`, `text-align: start`) so it mirrors under `dir="rtl"` without an override.
+- **New frontend page:** add a route folder under `frontend/src/app/`. Public and crawlable → a Server Component in `(en)/` **and** its twin in `fa/` (share the body via `src/lib/pages.jsx`), with metadata from `src/lib/seo.js`, and add it to `sitemap.js`. Needs sign-in → a `"use client"` page under `(en)/(app)/` wrapped in `RequireAuth`.

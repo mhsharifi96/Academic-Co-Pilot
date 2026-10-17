@@ -1,3 +1,5 @@
+"use client";
+
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Message from "./Message.jsx";
 import Icon from "./Icon.jsx";

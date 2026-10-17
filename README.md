@@ -77,12 +77,12 @@ session's files.)
 ### Run the UI with Docker (recommended)
 
 `docker-compose up --build` already builds and serves the UI at
-`http://localhost:5173` (nginx serves the production bundle and proxies `/api` to
+`http://localhost:5173` (a Next.js server renders the pages and proxies `/api` to
 the backend). Nothing else to do.
 
 ### Run the UI in development (hot reload)
 
-For live-reloading while editing the frontend, run the Vite dev server directly.
+For live-reloading while editing the frontend, run the Next.js dev server directly.
 Start the backend first (see *Launch the System*, or `uv run uvicorn app.main:app
 --reload`), then:
 
@@ -93,9 +93,10 @@ npm run dev
 ```
 
 Open `http://localhost:5173`. The dev server proxies `/api` to the backend on
-`:8000` (configured in `frontend/vite.config.js`), so no CORS setup is needed.
+`:8000` (override with `BACKEND_URL`; see `frontend/next.config.mjs`), so no CORS
+setup is needed.
 
-> Note: run **either** the Docker `frontend` service **or** the local Vite dev
+> Note: run **either** the Docker `frontend` service **or** the local Next.js dev
 > server — both use port `5173`.
 
 ## 🔌 API Endpoints
@@ -268,7 +269,7 @@ curl -X POST "http://localhost:8000/api/v1/chat" \
 │   ├── core/         # Config, Database, Sessions (file + interrupt tracking)
 │   ├── tools/        # Custom LangChain tool implementations
 │   └── main.py       # API Entrypoint
-├── frontend/         # React (Vite) single-page web UI
+├── frontend/         # Next.js web UI (SSR public pages + client app)
 ├── data/             # Shared directory for CSVs and PDFs
 ├── output_figures/   # Generated research charts/plots
 ├── pyproject.toml    # Project metadata and dependencies (uv)

@@ -1,8 +1,11 @@
+"use client";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as api from "../api.js";
 import * as auth from "../auth.js";
-import { useT } from "../i18n.js";
-import { navigate } from "../router.js";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { localePath, useT } from "../i18n.js";
 import InterruptCard from "./InterruptCard.jsx";
 import LangToggle from "./LangToggle.jsx";
 import Message from "./Message.jsx";
@@ -20,6 +23,7 @@ import WizardStepper from "./WizardStepper.jsx";
 // stepper above the conversation.
 export default function WizardRunner({ runId }) {
   const { t, lang } = useT();
+  const router = useRouter();
 
   const [run, setRun] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -272,7 +276,7 @@ export default function WizardRunner({ runId }) {
     if (!window.confirm(t("runner.discardConfirm"))) return;
     try {
       await api.abandonWizardRun(runId);
-      navigate("/runs");
+      router.push("/runs");
     } catch (e) {
       setError(e.message);
     }
@@ -307,10 +311,10 @@ export default function WizardRunner({ runId }) {
       )}
 
       <header className="wz-topbar">
-        <button className="wz-back" onClick={() => navigate("/runs")}>
+        <Link className="wz-back" href="/runs">
           <Icon name="arrow" size={16} className="wz-back-arrow" />
           <span>{t("nav.myRuns")}</span>
-        </button>
+        </Link>
         <span className="wz-runner-title">{run?.wizard_title || ""}</span>
         <div className="wz-topbar-actions">
           {balance !== null && (
@@ -417,12 +421,12 @@ export default function WizardRunner({ runId }) {
                 <h2>{t("runner.completedTitle")}</h2>
                 <p>{t("runner.completedBody")}</p>
                 <div className="wz-hero-actions">
-                  <button className="wz-btn ghost" onClick={() => navigate("/")}>
+                  <Link className="wz-btn ghost" href={`${localePath(lang, "/")}#catalog`}>
                     {t("runs.browse")}
-                  </button>
-                  <button className="wz-btn ghost" onClick={() => navigate("/app")}>
+                  </Link>
+                  <Link className="wz-btn ghost" href="/app">
                     {t("nav.backToApp")}
-                  </button>
+                  </Link>
                 </div>
               </div>
             )}

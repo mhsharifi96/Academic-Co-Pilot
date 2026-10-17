@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import { useT } from "../i18n.js";
 import Icon from "./Icon.jsx";

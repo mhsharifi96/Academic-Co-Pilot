@@ -6,6 +6,19 @@ All notable changes to this project. Format loosely follows
 ## [Unreleased]
 Work in progress on the current branch (`main`) — not yet committed. Adds the
 authentication and persistence layer on top of the original agent MVP:
+### Changed
+- **Frontend migrated from Vite + React SPA to Next.js 15 (App Router) for
+  SEO.** The landing page and wizard pages are now server-rendered HTML with
+  per-language URLs (`/`, `/wizards/[slug]`, Persian at `/fa/...`), two root
+  layouts so `<html lang|dir>` is correct before JS runs, canonical + `hreflang`
+  alternates, `WebApplication`/`HowTo` JSON-LD, and generated `sitemap.xml` and
+  `robots.txt`. The hash router is gone: real paths `/app`, `/runs`,
+  `/runs/[id]` (client-rendered, `noindex`); old `#/...` links are forwarded.
+  Sign-in redirects use `/app?next=<path>` instead of sessionStorage. The
+  frontend container now runs the Next standalone server on `:3000` (compose
+  maps 5173/5176 to it) and proxies `/api` itself — `nginx.conf`,
+  `vite.config.js`, `index.html` and `public/robots.txt` are removed. New env:
+  `BACKEND_URL` (build arg + runtime), `SITE_URL` (canonical origin). React 19.
 ### Added
 - **Landing page: "Why Academic Co-Pilot" and "Pay only for what you use"
   sections, plus SEO.** `WizardLanding.jsx` gains a six-point benefits grid, a

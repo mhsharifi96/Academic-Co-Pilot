@@ -1,67 +1,18 @@
-import { useEffect, useState } from "react";
-import * as api from "../api.js";
-import { useT } from "../i18n.js";
-import { navigate } from "../router.js";
+import Link from "next/link";
+import { localePath, translate } from "../i18n/strings.js";
+import { jsonLdScript, webApplicationJsonLd } from "../lib/seo.js";
 import LangToggle from "./LangToggle.jsx";
+import LegacyHashRedirect from "./LegacyHashRedirect.jsx";
+import { AppLink, MyRunsLink } from "./UserAware.jsx";
 import WizardCard from "./WizardCard.jsx";
 import Icon from "./Icon.jsx";
 
 // The public landing page: hero, "why us", the catalogue of published wizards,
-// a "how it works" band and how to top up the wallet.  Renders for signed-out
-// visitors, so it is mounted ahead of the app's auth gate and its data call
-// carries no token.
-
-// In-page links scroll rather than set `href="#id"`: the app uses a hash
-// router, so `#catalog` would parse as an unknown route and open the app.
-function scrollToSection(id) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
-}
-
-// Keep <title> and the meta description in the visitor's language. The static
-// English copies in index.html are what non-JS crawlers see.
-function useDocumentMeta(title, description) {
-  useEffect(() => {
-    const prevTitle = document.title;
-    document.title = title;
-    const meta = document.querySelector('meta[name="description"]');
-    const prevDesc = meta?.getAttribute("content");
-    meta?.setAttribute("content", description);
-    return () => {
-      document.title = prevTitle;
-      if (meta && prevDesc != null) meta.setAttribute("content", prevDesc);
-    };
-  }, [title, description]);
-}
-export default function WizardLanding({ user }) {
-  const { t, lang } = useT();
-  const [wizards, setWizards] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError("");
-    api
-      .listWizards(lang)
-      .then((rows) => {
-        if (!cancelled) setWizards(rows || []);
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e.message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [lang]);
-
-  useDocumentMeta(t("landing.metaTitle"), t("landing.metaDescription"));
+// a "how it works" band and how to top up the wallet.  A Server Component: the
+// catalogue is fetched on the server (see app/(en)/page.js) so crawlers get the
+// full page as HTML.  Only the signed-in-aware buttons hydrate on the client.
+export default function WizardLanding({ lang, wizards, error }) {
+  const t = (key, vars) => translate(lang, key, vars);
 
   const reasons = [
     { icon: "quote", title: t("landing.why1Title"), body: t("landing.why1Body") },
@@ -95,30 +46,31 @@ export default function WizardLanding({ user }) {
     { icon: "clock", title: t("landing.how3Title"), body: t("landing.how3Body") },
   ];
 
+  const langHrefs = { en: localePath("en", "/"), fa: localePath("fa", "/") };
+
   return (
     <div className="wz-landing">
+      <LegacyHashRedirect />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={jsonLdScript(webApplicationJsonLd(lang))}
+      />
+
       <header className="wz-topbar">
-        <a className="wz-brand" href="#/">
+        <Link className="wz-brand" href={localePath(lang, "/")}>
           <Icon name="sparkles" size={20} />
           <span>Academic Co-Pilot</span>
-        </a>
+        </Link>
         <nav className="wz-topnav" aria-label={t("landing.navLabel")}>
           {navLinks.map((l) => (
-            <button
-              key={l.id}
-              type="button"
-              className="wz-topnav-link"
-              onClick={() => scrollToSection(l.id)}
-            >
+            <a key={l.id} className="wz-topnav-link" href={`#${l.id}`}>
               {l.label}
-            </button>
+            </a>
           ))}
         </nav>
         <div className="wz-topbar-actions">
-          <LangToggle compact />
-          <button className="wz-btn ghost" onClick={() => navigate("/app")}>
-            {user ? t("nav.backToApp") : t("nav.signIn")}
-          </button>
+          <LangToggle compact hrefs={langHrefs} />
+          <AppLink />
         </div>
       </header>
 
@@ -129,19 +81,11 @@ export default function WizardLanding({ user }) {
           <h1 className="wz-hero-title">{t("landing.title")}</h1>
           <p className="wz-hero-sub">{t("landing.subtitle")}</p>
           <div className="wz-hero-actions">
-            <button
-              type="button"
-              className="wz-btn primary"
-              onClick={() => scrollToSection("catalog")}
-            >
+            <a className="wz-btn primary" href="#catalog">
               {t("landing.cta")}
               <Icon name="arrow" size={16} className="wz-go-arrow" />
-            </button>
-            {user && (
-              <button className="wz-btn ghost" onClick={() => navigate("/runs")}>
-                {t("nav.myRuns")}
-              </button>
-            )}
+            </a>
+            <MyRunsLink />
           </div>
         </section>
 
@@ -169,22 +113,17 @@ export default function WizardLanding({ user }) {
 
           {error && <div className="banner-error">⚠️ {error}</div>}
 
-          {loading ? (
-            <p className="wz-muted">{t("landing.loading")}</p>
-          ) : wizards.length === 0 ? (
-            <div className="wz-empty">
-              <p>{t("landing.empty")}</p>
-              <p className="wz-muted">{t("landing.emptyHint")}</p>
-            </div>
+          {wizards.length === 0 ? (
+            !error && (
+              <div className="wz-empty">
+                <p>{t("landing.empty")}</p>
+                <p className="wz-muted">{t("landing.emptyHint")}</p>
+              </div>
+            )
           ) : (
             <div className="wz-grid">
               {wizards.map((w, i) => (
-                <WizardCard
-                  key={w.id}
-                  wizard={w}
-                  index={i}
-                  onOpen={(x) => navigate(`/wizards/${encodeURIComponent(x.slug)}`)}
-                />
+                <WizardCard key={w.id} wizard={w} lang={lang} index={i} />
               ))}
             </div>
           )}
@@ -243,16 +182,13 @@ export default function WizardLanding({ user }) {
         <section className="wz-section wz-cta-band">
           <h2 className="wz-section-title">{t("landing.ctaTitle")}</h2>
           <p className="wz-section-sub">{t("landing.ctaBody")}</p>
-          <button className="wz-btn primary" onClick={() => navigate("/app")}>
-            {user ? t("nav.backToApp") : t("landing.chargeCta")}
-            <Icon name="arrow" size={16} className="wz-go-arrow" />
-          </button>
+          <AppLink className="wz-btn primary" signedOutKey="landing.chargeCta" arrow />
         </section>
       </main>
 
       <footer className="wz-footer">
         <span>{t("landing.footer")}</span>
-        <LangToggle compact />
+        <LangToggle compact hrefs={langHrefs} />
       </footer>
     </div>
   );

@@ -1,3 +1,5 @@
+"use client";
+
 import { useT } from "../i18n.js";
 import Icon from "./Icon.jsx";
 

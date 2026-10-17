@@ -1,7 +1,9 @@
+"use client";
+
 import { useEffect, useState } from "react";
 import * as api from "../api.js";
-import { useT } from "../i18n.js";
-import { navigate } from "../router.js";
+import Link from "next/link";
+import { localePath, useT } from "../i18n.js";
 import LangToggle from "./LangToggle.jsx";
 import Icon from "./Icon.jsx";
 
@@ -22,12 +24,9 @@ function RunRow({ run, label }) {
           {when && <> · {t("runs.updated", { when })}</>}
         </span>
       </span>
-      <button
-        className="wz-btn ghost small"
-        onClick={() => navigate(`/runs/${encodeURIComponent(run.id)}`)}
-      >
+      <Link className="wz-btn ghost small" href={`/runs/${encodeURIComponent(run.id)}`}>
         {done ? t("runs.open") : t("wizard.continue")}
-      </button>
+      </Link>
     </li>
   );
 }
@@ -65,15 +64,15 @@ export default function WizardRunsPage() {
   return (
     <div className="wz-landing">
       <header className="wz-topbar">
-        <a className="wz-brand" href="#/">
+        <Link className="wz-brand" href={localePath(lang, "/")}>
           <Icon name="sparkles" size={20} />
           <span>Academic Co-Pilot</span>
-        </a>
+        </Link>
         <div className="wz-topbar-actions">
           <LangToggle compact />
-          <button className="wz-btn ghost" onClick={() => navigate("/app")}>
+          <Link className="wz-btn ghost" href="/app">
             {t("nav.backToApp")}
-          </button>
+          </Link>
         </div>
       </header>
 
@@ -88,9 +87,9 @@ export default function WizardRunsPage() {
         ) : runs.length === 0 ? (
           <div className="wz-empty">
             <p>{t("runs.empty")}</p>
-            <button className="wz-btn primary" onClick={() => navigate("/")}>
+            <Link className="wz-btn primary" href={`${localePath(lang, "/")}#catalog`}>
               {t("runs.browse")}
-            </button>
+            </Link>
           </div>
         ) : (
           <>

@@ -7,7 +7,7 @@
 }
 
 academic.hiagent.me {
-	# All traffic (SPA + /api) goes to the frontend nginx, which serves the
-	# built React bundle and reverse-proxies /api to the app container.
-	reverse_proxy frontend:80
+	# All traffic (pages + /api) goes to the Next.js frontend, which
+	# server-renders the public pages and proxies /api to the app container.
+	reverse_proxy frontend:3000
 }

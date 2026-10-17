@@ -45,10 +45,17 @@ services:
     command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8005 --reload
 
   frontend:
-    build: ./frontend
+    # Next.js server: SSR public pages + proxies /api to the app service.
+    build:
+      context: ./frontend
+      args:
+        - BACKEND_URL=http://app:8005
     container_name: paper_agent_ui
+    environment:
+      - BACKEND_URL=http://app:8005
+      - SITE_URL=${SITE_URL:-http://localhost:5173}
     ports:
-      - "5173:80"
+      - "5173:3000"
     depends_on:
       - app
 

@@ -1,3 +1,5 @@
+"use client";
+
 // Agent picker shown before a chat starts. The choice is bound to the session
 // on the first message, so once a session exists this renders a read-only badge
 // instead of the picker (see ChatWindow).

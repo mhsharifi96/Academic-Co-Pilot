@@ -6,7 +6,7 @@ over re-scanning the codebase. For depth see `Design.md`, `PRD.md`,
 
 ## Identity
 - **Name:** Academic Co-Pilot ("PaperAgent"). Agentic RAG research assistant.
-- **Stack:** FastAPI + LangChain 1.0 `create_agent` (LangGraph) + OpenAI + Postgres/pgvector + React/Vite.
+- **Stack:** FastAPI + LangChain 1.0 `create_agent` (LangGraph) + OpenAI + Postgres/pgvector + Next.js 15 (App Router).
 - ⚠️ **No Django** despite the `django/PaperAgent` folder path.
 
 ## Gotchas (the things that trip people up)
@@ -107,9 +107,12 @@ over re-scanning the codebase. For depth see `Design.md`, `PRD.md`,
    - Locale is `?lang=en|fa`; public routes resolve one language and never expose
      `guideline_prompt`. Admin write schemas also accept the original spellings
      `gaurdline_prompt` / `max_masseage` as aliases.
-   - Frontend: hash router (`frontend/src/router.js`) mounted **above** the auth
-     gate so `#/` is public; `frontend/src/i18n.js` holds the en/fa dictionary
-     and drives `<html lang|dir>`. New CSS uses logical properties for RTL.
+   - Frontend: Next.js routes — public `/`, `/wizards/[slug]` (+ `/fa/...`) are
+     Server Components (SSR for SEO); `/app`, `/runs` are client-only + noindex.
+     Two root layouts (`app/(en)`, `app/fa`) so `<html lang|dir>` is server-correct.
+     Strings in `frontend/src/i18n/strings.js` (server-safe `translate`); client
+     `useT` in `frontend/src/i18n.js`. `/api` rewrite target `BACKEND_URL` is baked
+     at **build** time. New CSS uses logical properties for RTL.
    - On success the PDF goes through the **same ingestion path** as `/upload`
      (`ingest_pdf` + `session_manager.add_files`) → becomes conversation context.
 8. **LLM/image calls have a central seam** — `app/repositories/llm.py`

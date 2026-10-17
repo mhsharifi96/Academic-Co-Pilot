@@ -1,3 +1,5 @@
+"use client";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as api from "../api.js";
 import * as auth from "../auth.js";

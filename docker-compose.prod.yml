@@ -57,13 +57,21 @@ services:
     # No command override -> uses the Dockerfile CMD (uvicorn, no --reload).
 
   frontend:
-    build: ./frontend
+    # Next.js server: SSR public pages + proxies /api to the app service.
+    build:
+      context: ./frontend
+      args:
+        - BACKEND_URL=http://app:8005
     container_name: paper_agent_ui
     restart: unless-stopped
+    environment:
+      - BACKEND_URL=http://app:8005
+      # Canonical origin for canonical/hreflang links, Open Graph and sitemap.
+      - SITE_URL=${SITE_URL:-https://academic.hiagent.me}
     ports:
       # Bind to localhost only — the host nginx proxies to this; the public
       # never reaches it directly.
-      - "127.0.0.1:5176:80"
+      - "127.0.0.1:5176:3000"
     depends_on:
       - app
 

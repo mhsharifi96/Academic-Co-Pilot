@@ -1,5 +1,7 @@
+"use client";
+
 import { useState } from "react";
-import { navigate } from "../router.js";
+import Link from "next/link";
 import { useT } from "../i18n.js";
 import LangToggle from "./LangToggle.jsx";
 import TopUpModal from "./TopUpModal.jsx";
@@ -47,13 +49,13 @@ export default function SessionBar({
         >
           Downloads
         </button>
-        {/* These two leave the chat view entirely — they are hash routes. */}
+        {/* These two leave the chat view entirely — they are their own routes. */}
         <button className="nav-link" onClick={() => onNavigate("wizards")}>
           {t("nav.wizards")}
         </button>
-        <button className="nav-link" onClick={() => navigate("/runs")}>
+        <Link className="nav-link" href="/runs">
           {t("nav.myRuns")}
-        </button>
+        </Link>
         {user?.is_admin && (
           <button
             className={`nav-link${view === "admin" ? " active" : ""}`}

@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useRef } from "react";
 
 // Cloudflare Turnstile widget, rendered explicitly so the login screen (which
